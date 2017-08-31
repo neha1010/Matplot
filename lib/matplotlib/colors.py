@@ -58,6 +58,7 @@ import warnings
 import numpy as np
 import matplotlib.cbook as cbook
 from ._color_data import BASE_COLORS, TABLEAU_COLORS, CSS4_COLORS, XKCD_COLORS
+from abc import ABCMeta
 
 
 class _ColorMapping(dict):
@@ -462,11 +463,18 @@ class Colormap(object):
             xa = np.array([X])
         else:
             vtype = 'array'
+            if isinstance(self, BivariateColormap):
+                vals = np.array([1, 0], dtype=X.dtype)
+                almost_one = np.nextafter(*vals)
+                np.copyto(X, almost_one, where=X == 1.0)
+                X[0] = X[0] * 256
+                X[1] = X[1] * 256
+                X = X.astype(int)
+                X = X[0] + X[1] * 256
             xma = np.ma.array(X, copy=True)  # Copy here to avoid side effects.
             mask_bad = xma.mask              # Mask will be used below.
             xa = xma.filled()                # Fill to avoid infs, etc.
             del xma
-
         # Calculations with native byteorder are faster, and avoid a
         # bug that otherwise can occur with putmask when the last
         # argument is a numpy scalar.
@@ -846,7 +854,42 @@ class ListedColormap(Colormap):
         return ListedColormap(colors_r, name=name, N=self.N)
 
 
-class Normalize(object):
+class BivariateColormap(Colormap):
+    def __init__(self, name='bivariate', N=256):
+        Colormap.__init__(self, name, N)
+        self.N = self.N * self.N
+
+    def _init(self):
+        red = np.linspace(0, 1, np.sqrt(self.N))
+        green = np.linspace(0, 1, np.sqrt(self.N))
+        red_mesh, green_mesh = np.meshgrid(red, green)
+        blue_mesh = np.zeros_like(red_mesh)
+        alpha_mesh = np.ones_like(red_mesh)
+        bivariate_cmap = np.dstack((red_mesh, green_mesh, blue_mesh,
+                                    alpha_mesh))
+        self._lut = np.vstack(bivariate_cmap)
+        self._isinit = True
+        self._set_extremes()
+
+    def _resample(self, lutsize):
+        """
+        Return a new color map with *lutsize x lutsize* entries.
+        """
+        return BivariateColormap(self.name, lutsize)
+
+    def reversed(self, name=None):
+        raise NotImplementedError
+
+
+@six.add_metaclass(ABCMeta)
+class Norms:
+    """
+    Abstract Base Class to group `Normalize` and `BivariateNorm`
+    """
+    pass
+
+
+class Normalize(Norms):
     """
     A class which, when called, can normalize data into
     the ``[0.0, 1.0]`` interval.
@@ -1336,6 +1379,67 @@ class NoNorm(Normalize):
 
     def inverse(self, value):
         return value
+
+
+class BivariateNorm(Norms):
+    """
+    Normalize a list of two values corresponding to two 1D normalizers
+    """
+    def __init__(self, norm1=None, norm2=None):
+        """
+        Parameters
+        ----------
+        norm1 :
+            An instance of 1D normalizers
+        norm2 :
+            An instance of 1D normalizers
+        """
+        if norm1 is None:
+            self.norm1 = Normalize()
+        else:
+            self.norm1 = norm1
+        if norm2 is None:
+            self.norm2 = Normalize()
+        else:
+            self.norm2 = norm2
+
+    def __call__(self, values, clip=None):
+        """
+        Parameters
+        ----------
+        values : array-like
+            A list of two values to be normalized
+        clip : list of bools, None, optional
+            A list of two bools corresponding to value in values.
+            If clip is None then clip is set according to corresponding
+            normalizers.
+
+        Returns
+        -------
+        A list of two normalized values according to corresponding 1D
+        normalizers.
+        """
+        if clip is None:
+            clip = [self.norm1.clip, self.norm2.clip]
+
+        return np.asarray([self.norm1(values[0], clip=clip[0]),
+                          self.norm2(values[1], clip=clip[1])])
+
+    def autoscale(self, A):
+        """
+        Set *vmin*, *vmax* to min, max of *A*.
+        """
+        self.norm1.autoscale(A[0])
+        self.norm2.autoscale(A[1])
+
+    def autoscale_None(self, A):
+        'autoscale only None-valued vmin or vmax'
+        self.norm1.autoscale_None(A[0])
+        self.norm2.autoscale_None(A[1])
+
+    def scaled(self):
+        'return true if vmin and vmax set for both normalizers'
+        return self.norm1.scaled() and self.norm2.scaled()
 
 
 def rgb_to_hsv(arr):

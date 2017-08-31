@@ -4100,7 +4100,8 @@ or tuple of floats
 
         if colors is None:
             if norm is not None and not isinstance(norm, mcolors.Normalize):
-                msg = "'norm' must be an instance of 'mcolors.Normalize'"
+                msg = ("'norm' must be an instance of 'mcolors.Normalize' or "
+                       "'mcolors.BivariateNorm'")
                 raise ValueError(msg)
             collection.set_array(np.asarray(c))
             collection.set_cmap(cmap)
@@ -4459,7 +4460,8 @@ or tuple of floats
             accum = bins.searchsorted(accum)
 
         if norm is not None and not isinstance(norm, mcolors.Normalize):
-            msg = "'norm' must be an instance of 'mcolors.Normalize'"
+            msg = ("'norm' must be an instance of 'mcolors.Normalize' or "
+                   "'mcolors.BivariateNorm'")
             raise ValueError(msg)
         collection.set_array(accum)
         collection.set_cmap(cmap)
@@ -5073,23 +5075,25 @@ or tuple of floats
 
         Parameters
         ----------
-        X : array_like, shape (n, m) or (n, m, 3) or (n, m, 4)
+        X : array_like, shape (n, m) or (n, m, 3) or (n, m, 4) or (2, n, m)
             Display the image in `X` to current axes.  `X` may be an
             array or a PIL image. If `X` is an array, it
             can have the following shapes and types:
 
-            - MxN -- values to be mapped (float or int)
+            - MxN -- univariate values to be mapped (float or int)
             - MxNx3 -- RGB (float or uint8)
             - MxNx4 -- RGBA (float or uint8)
+            - 2xMxN -- bivariate values to be mapped (float or int)
 
             The value for each component of MxNx3 and MxNx4 float arrays
-            should be in the range 0.0 to 1.0. MxN arrays are mapped
+            should be in the range 0.0 to 1.0. MxN and 2xMxN arrays are mapped
             to colors based on the `norm` (mapping scalar to scalar)
             and the `cmap` (mapping the normed scalar to a color).
 
-        cmap : `~matplotlib.colors.Colormap`, optional, default: None
+        cmap : `~matplotlib.colors.Colormap`, \
+            `~matplotlib.colors.BivariateColormap`, optional, default: None
             If None, default to rc `image.cmap` value. `cmap` is ignored
-            if `X` is 3-D, directly specifying RGB(A) values.
+            if `X` is 3-D but not bivariate, directly specifying RGB(A) values.
 
         aspect : ['auto' | 'equal' | scalar], optional, default: None
             If 'auto', changes the image aspect ratio to match that of the
@@ -5113,7 +5117,8 @@ or tuple of floats
             on the Agg, ps and pdf backends. Other backends will fall back to
             'nearest'.
 
-        norm : `~matplotlib.colors.Normalize`, optional, default: None
+        norm : `~matplotlib.colors.Normalize`, \
+            `matplotlib.colors.BivariateNorm`, optional, default: None
             A `~matplotlib.colors.Normalize` instance is used to scale
             a 2-D float `X` input to the (0, 1) range for input to the
             `cmap`. If `norm` is None, use the default func:`normalize`.
@@ -5173,16 +5178,29 @@ or tuple of floats
         of pixel (0, 0).
 
         """
-
         if not self._hold:
             self.cla()
 
-        if norm is not None and not isinstance(norm, mcolors.Normalize):
-            msg = "'norm' must be an instance of 'mcolors.Normalize'"
+        if norm is not None and not isinstance(norm, mcolors.Norms):
+            msg = ("'norm' must be an instance of 'mcolors.Normalize' or "
+                   "'mcolors.BivariateNorm'")
             raise ValueError(msg)
+
+        temp = np.asarray(X)
+        is_bivari = (isinstance(norm, mcolors.BivariateNorm) or
+                     isinstance(cmap, mcolors.BivariateColormap))
+        if is_bivari:
+            if temp.ndim != 3 and temp.shape[0] != 2:
+                raise TypeError("Expected shape like (2, n, m)")
+            if cmap is None:
+                cmap = mcolors.BivariateColormap()
+            if norm is None:
+                norm = mcolors.BivariateNorm()
+
         if aspect is None:
             aspect = rcParams['image.aspect']
         self.set_aspect(aspect)
+
         im = mimage.AxesImage(self, cmap, norm, interpolation, origin, extent,
                               filternorm=filternorm, filterrad=filterrad,
                               resample=resample, **kwargs)
@@ -5209,7 +5227,6 @@ or tuple of floats
 
     @staticmethod
     def _pcolorargs(funcname, *args, **kw):
-        # This takes one kwarg, allmatch.
         # If allmatch is True, then the incoming X, Y, C must
         # have matching dimensions, taking into account that
         # X and Y can be 1-D rather than 2-D.  This perfect
@@ -5222,10 +5239,17 @@ or tuple of floats
         # is False.
 
         allmatch = kw.pop("allmatch", False)
+        norm = kw.pop("norm", None)
+        cmap = kw.pop("cmap", None)
 
         if len(args) == 1:
             C = np.asanyarray(args[0])
-            numRows, numCols = C.shape
+            is_bivari = (isinstance(norm, mcolors.BivariateNorm) or
+                         isinstance(cmap, mcolors.BivariateColormap))
+            if is_bivari:
+                numRows, numCols = C.shape[1:]
+            else:
+                numRows, numCols = C.shape
             if allmatch:
                 X, Y = np.meshgrid(np.arange(numCols), np.arange(numRows))
             else:
@@ -5236,7 +5260,12 @@ or tuple of floats
 
         if len(args) == 3:
             X, Y, C = [np.asanyarray(a) for a in args]
-            numRows, numCols = C.shape
+            is_bivari = (isinstance(norm, mcolors.BivariateNorm) or
+                         isinstance(cmap, mcolors.BivariateColormap))
+            if is_bivari:
+                numRows, numCols = C.shape[1:]
+            else:
+                numRows, numCols = C.shape
         else:
             raise TypeError(
                 'Illegal arguments to %s; see help(%s)' % (funcname, funcname))
@@ -5271,7 +5300,7 @@ or tuple of floats
     @docstring.dedent_interpd
     def pcolor(self, *args, **kwargs):
         """
-        Create a pseudocolor plot of a 2-D array.
+        Create a pseudocolor plot of a 2-D univariate or 3-D bivariate array.
 
         Call signatures::
 
@@ -5309,10 +5338,12 @@ or tuple of floats
             vectors, they will be expanded as needed into the appropriate 2-D
             arrays, making a rectangular grid.
 
-        cmap : `~matplotlib.colors.Colormap`, optional, default: None
+        cmap : `~matplotlib.colors.Colormap` or \
+            `matplotlib.colors.BivariateColormap`, optional, default: None
             If `None`, default to rc settings.
 
-        norm : `matplotlib.colors.Normalize`, optional, default: None
+        norm : `matplotlib.colors.Normalize` or \
+            `matplotlib.colors.BivariateNorm`, optional, default: None
             An instance is used to scale luminance data to (0, 1).
             If `None`, defaults to :func:`normalize`.
 
@@ -5418,8 +5449,19 @@ or tuple of floats
         vmin = kwargs.pop('vmin', None)
         vmax = kwargs.pop('vmax', None)
 
-        X, Y, C = self._pcolorargs('pcolor', *args, allmatch=False)
+        kw = {'norm': norm, 'cmap': cmap, 'allmatch': False}
+        X, Y, C = self._pcolorargs('pcolor', *args, **kw)
         Ny, Nx = X.shape
+
+        is_bivari = (isinstance(norm, mcolors.BivariateNorm) or
+                     isinstance(cmap, mcolors.BivariateColormap))
+        if is_bivari:
+            if C.ndim != 3 and C.shape[0] != 2:
+                raise TypeError("Expected shape like (2, n, m)")
+            if cmap is None:
+                cmap = mcolors.BivariateColormap()
+            if norm is None:
+                norm = mcolors.BivariateNorm()
 
         # unit conversion allows e.g. datetime objects as axis values
         self._process_unit_info(xdata=X, ydata=Y, kwargs=kwargs)
@@ -5435,7 +5477,10 @@ or tuple of floats
         xymask = (mask[0:-1, 0:-1] + mask[1:, 1:] +
                   mask[0:-1, 1:] + mask[1:, 0:-1])
         # don't plot if C or any of the surrounding vertices are masked.
-        mask = ma.getmaskarray(C) + xymask
+        if isinstance(norm, mcolors.BivariateNorm):
+            mask = ma.getmaskarray(C[0]) + ma.getmaskarray(C[1]) + xymask
+        else:
+            mask = ma.getmaskarray(C) + xymask
 
         newaxis = np.newaxis
         compress = np.compress
@@ -5459,7 +5504,15 @@ or tuple of floats
                             axis=1)
         verts = xy.reshape((npoly, 5, 2))
 
-        C = compress(ravelmask, ma.filled(C[0:Ny - 1, 0:Nx - 1]).ravel())
+        if isinstance(norm, mcolors.BivariateNorm):
+            C = np.array([
+                            compress(
+                                ravelmask,
+                                ma.filled(c[0:Ny - 1, 0:Nx - 1]).ravel()
+                            ) for c in C
+                        ])
+        else:
+            C = compress(ravelmask, ma.filled(C[0:Ny - 1, 0:Nx - 1]).ravel())
 
         linewidths = (0.25,)
         if 'linewidth' in kwargs:
@@ -5486,9 +5539,12 @@ or tuple of floats
 
         collection.set_alpha(alpha)
         collection.set_array(C)
-        if norm is not None and not isinstance(norm, mcolors.Normalize):
-            msg = "'norm' must be an instance of 'mcolors.Normalize'"
+
+        if norm is not None and not isinstance(norm, mcolors.Norms):
+            msg = ("'norm' must be an instance of 'mcolors.Normalize' or "
+                   "'mcolors.BivariateNorm'")
             raise ValueError(msg)
+
         collection.set_cmap(cmap)
         collection.set_norm(norm)
         collection.set_clim(vmin, vmax)
@@ -5554,11 +5610,13 @@ or tuple of floats
         Keyword arguments:
 
           *cmap*: [ *None* | Colormap ]
-            A :class:`matplotlib.colors.Colormap` instance. If *None*, use
-            rc settings.
+            A :class:`matplotlib.colors.Colormap` or
+            :class:`matplotlib.colors.BivariateColormap` instance. If *None*,
+            use rc settings.
 
           *norm*: [ *None* | Normalize ]
-            A :class:`matplotlib.colors.Normalize` instance is used to
+            A :class:`matplotlib.colors.Normalize` or
+            :class:`matplotlib.colors.BivariateNorm` instance is used to
             scale luminance data to 0,1. If *None*, defaults to
             :func:`normalize`.
 
@@ -5618,16 +5676,31 @@ or tuple of floats
 
         allmatch = (shading == 'gouraud')
 
-        X, Y, C = self._pcolorargs('pcolormesh', *args, allmatch=allmatch)
+        kw = {'norm': norm, 'cmap': cmap, 'allmatch': allmatch}
+        X, Y, C = self._pcolorargs('pcolormesh', *args, **kw)
         Ny, Nx = X.shape
+
+        is_bivari = (isinstance(norm, mcolors.BivariateNorm) or
+                     isinstance(cmap, mcolors.BivariateColormap))
+        if is_bivari:
+            if C.ndim != 3 and C.shape[0] != 2:
+                raise TypeError("Expected shape like (2, n, m)")
+            if cmap is None:
+                cmap = mcolors.BivariateColormap()
+            if norm is None:
+                norm = mcolors.BivariateNorm()
 
         # unit conversion allows e.g. datetime objects as axis values
         self._process_unit_info(xdata=X, ydata=Y, kwargs=kwargs)
         X = self.convert_xunits(X)
         Y = self.convert_yunits(Y)
 
-        # convert to one dimensional arrays
-        C = C.ravel()
+        # convert to one dimensional arrays if univariate
+        if isinstance(norm, mcolors.BivariateNorm):
+            C = np.asarray([c.ravel() for c in C])
+        else:
+            C = C.ravel()
+
         coords = np.column_stack((X.flat, Y.flat)).astype(float, copy=False)
 
         collection = mcoll.QuadMesh(Nx - 1, Ny - 1, coords,
@@ -5635,8 +5708,9 @@ or tuple of floats
                                     **kwargs)
         collection.set_alpha(alpha)
         collection.set_array(C)
-        if norm is not None and not isinstance(norm, mcolors.Normalize):
-            msg = "'norm' must be an instance of 'mcolors.Normalize'"
+        if norm is not None and not isinstance(norm, mcolors.Norms):
+            msg = ("'norm' must be an instance of 'mcolors.Normalize' or "
+                   "'mcolors.BivariateNorm'")
             raise ValueError(msg)
         collection.set_cmap(cmap)
         collection.set_norm(norm)
@@ -5670,7 +5744,7 @@ or tuple of floats
     @docstring.dedent_interpd
     def pcolorfast(self, *args, **kwargs):
         """
-        pseudocolor plot of a 2-D array
+        pseudocolor plot of a 2-D univariate or 3-D bivariate array
 
         Experimental; this is a pcolor-type method that
         provides the fastest possible rendering with the Agg
@@ -5729,11 +5803,13 @@ or tuple of floats
         Optional keyword arguments:
 
           *cmap*: [ *None* | Colormap ]
-            A :class:`matplotlib.colors.Colormap` instance from cm. If *None*,
-            use rc settings.
+            A :class:`matplotlib.colors.Colormap` or
+            :class:`matplotlib.colors.BivariateColormap` instance from cm.
+            If *None*, use rc settings.
 
           *norm*: [ *None* | Normalize ]
-            A :class:`matplotlib.colors.Normalize` instance is used to scale
+            A :class:`matplotlib.colors.Normalize` or
+            :class:`matplotlib.colors.BivariateNorm` instance is used to scale
             luminance data to 0,1. If *None*, defaults to normalize()
 
           *vmin*/*vmax*: [ *None* | scalar ]
@@ -5759,12 +5835,26 @@ or tuple of floats
         cmap = kwargs.pop('cmap', None)
         vmin = kwargs.pop('vmin', None)
         vmax = kwargs.pop('vmax', None)
-        if norm is not None and not isinstance(norm, mcolors.Normalize):
-            msg = "'norm' must be an instance of 'mcolors.Normalize'"
+
+        if norm is not None and not isinstance(norm, mcolors.Norms):
+            msg = ("'norm' must be an instance of 'mcolors.Normalize' or "
+                   "'mcolors.BivariateNorm'")
             raise ValueError(msg)
 
-        C = args[-1]
-        nr, nc = C.shape
+        C = np.asarray(args[-1])
+
+        is_bivari = (isinstance(norm, mcolors.BivariateNorm) or
+                     isinstance(cmap, mcolors.BivariateColormap))
+        if is_bivari:
+            if C.ndim != 3 and C.shape[0] != 2:
+                raise TypeError("Expected shape like (2, n, m)")
+            if cmap is None:
+                cmap = mcolors.BivariateColormap()
+            if norm is None:
+                norm = mcolors.BivariateNorm()
+            nr, nc = C.shape[1:]
+        else:
+            nr, nc = C.shape
         if len(args) == 1:
             style = "image"
             x = [0, nc]
