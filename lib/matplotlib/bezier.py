@@ -3,15 +3,24 @@ A module providing some utility functions regarding Bezier path manipulation.
 """
 
 import math
+import warnings
+from collections import deque
 
 import numpy as np
 
 import matplotlib.cbook as cbook
-from matplotlib.path import Path
+
+# same algorithm as 3.8's math.comb
+@np.vectorize
+def _comb(n, k):
+    k = min(k, n - k)
+    i = np.arange(1, k + 1)
+    return np.prod((n + 1 - i)/i).astype(int)
 
 
 class NonIntersectingPathException(ValueError):
     pass
+
 
 # some functions
 
@@ -66,6 +75,15 @@ def get_normal_points(cx, cy, cos_t, sin_t, length):
     x2, y2 = length * cos_t2 + cx, length * sin_t2 + cy
 
     return x1, y1, x2, y2
+
+
+@cbook.deprecated("3.3", alternative="Path.split_path_inout()")
+def split_path_inout(path, inside, tolerance=0.01, reorder_inout=False):
+    """
+    Divide a path into two segments at the point where ``inside(x, y)``
+    becomes False.
+    """
+    return path.split_path_inout(inside, tolerance, reorder_inout)
 
 
 # BEZIER routines
@@ -168,26 +186,379 @@ def find_bezier_t_intersecting_with_closedpath(
 
 class BezierSegment:
     """
-    A D-dimensional Bezier segment.
+    A d-dimensional Bezier segment.
 
     Parameters
     ----------
-    control_points : (N, D) array
+    control_points : (N, d) array
         Location of the *N* control points.
     """
 
     def __init__(self, control_points):
-        n = len(control_points)
-        self._orders = np.arange(n)
-        coeff = [math.factorial(n - 1)
-                 // (math.factorial(i) * math.factorial(n - 1 - i))
-                 for i in range(n)]
-        self._px = np.asarray(control_points).T * coeff
+        self._cpoints = np.asarray(control_points)
+        self._N, self._d = self._cpoints.shape
+        self._orders = np.arange(self._N)
+        coeff = [math.factorial(self._N - 1)
+                 // (math.factorial(i) * math.factorial(self._N - 1 - i))
+                 for i in range(self._N)]
+        self._px = (self._cpoints.T * coeff).T
+
+    def __call__(self, t):
+        t = np.array(t)
+        orders_shape = (1,)*t.ndim + self._orders.shape
+        t_shape = t.shape + (1,)  # self._orders.ndim == 1
+        orders = np.reshape(self._orders, orders_shape)
+        rev_orders = np.reshape(self._orders[::-1], orders_shape)
+        t = np.reshape(t, t_shape)
+        return ((1 - t)**rev_orders * t**orders) @ self._px
 
     def point_at_t(self, t):
         """Return the point on the Bezier curve for parameter *t*."""
-        return tuple(
-            self._px @ (((1 - t) ** self._orders)[::-1] * t ** self._orders))
+        return tuple(self(t))
+
+    def split_at_t(self, t):
+        """Split into two Bezier curves using de casteljau's algorithm.
+
+        Parameters
+        ----------
+        t : float
+            Point in [0,1] at which to split into two curves
+
+        Returns
+        -------
+        B1, B2 : BezierSegment
+            The two sub-curves.
+        """
+        new_cpoints = split_de_casteljau(self._cpoints, t)
+        return BezierSegment(new_cpoints[0]), BezierSegment(new_cpoints[1])
+
+    def control_net_length(self):
+        """Sum of lengths between control points"""
+        L = 0
+        N, d = self._cpoints.shape
+        for i in range(N - 1):
+            L += np.linalg.norm(self._cpoints[i+1] - self._cpoints[i])
+        return L
+
+    def arc_length(self, rtol=None, atol=None):
+        """Estimate the length using iterative refinement.
+
+        Our estimate is just the average between the length of the chord and
+        the length of the control net.
+
+        Since the chord length and control net give lower and upper bounds
+        (respectively) on the length, this maximum possible error is tested
+        against an absolute tolerance threshold at each subdivision.
+
+        However, sometimes this estimator converges much faster than this error
+        esimate would suggest. Therefore, the relative change in the length
+        estimate between subdivisions is compared to a relative error tolerance
+        after each set of subdivisions.
+
+        Parameters
+        ----------
+        rtol : float, default 1e-4
+            If :code:`abs(est[i+1] - est[i]) <= rtol * est[i+1]`, we return
+            :code:`est[i+1]`.
+        atol : float, default 1e-6
+            If the distance between chord length and control length at any
+            point falls below this number, iteration is terminated.
+        """
+        if rtol is None:
+            rtol = 1e-4
+        if atol is None:
+            atol = 1e-6
+
+        chord = np.linalg.norm(self._cpoints[-1] - self._cpoints[0])
+        net = self.control_net_length()
+        max_err = (net - chord)/2
+        curr_est = chord + max_err
+        # early exit so we don't try to "split" paths of zero length
+        if max_err < atol:
+            return curr_est
+
+        prev_est = np.inf
+        curves = deque([self])
+        errs = deque([max_err])
+        lengths = deque([curr_est])
+        while np.abs(curr_est - prev_est) > rtol * curr_est:
+            # subdivide the *whole* curve before checking relative convergence
+            # again
+            prev_est = curr_est
+            num_curves = len(curves)
+            for i in range(num_curves):
+                curve = curves.popleft()
+                new_curves = curve.split_at_t(0.5)
+                max_err -= errs.popleft()
+                curr_est -= lengths.popleft()
+                for ncurve in new_curves:
+                    chord = np.linalg.norm(
+                            ncurve._cpoints[-1] - ncurve._cpoints[0])
+                    net = ncurve.control_net_length()
+                    nerr = (net - chord)/2
+                    nlength = chord + nerr
+                    max_err += nerr
+                    curr_est += nlength
+                    curves.append(ncurve)
+                    errs.append(nerr)
+                    lengths.append(nlength)
+                if max_err < atol:
+                    return curr_est
+        return curr_est
+
+    def arc_center_of_mass(self):
+        r"""
+        Center of mass of the (even-odd-rendered) area swept out by the ray
+        from the origin to the path.
+
+        Summing this vector for each segment along a closed path will produce
+        that area's center of mass.
+
+        Returns
+        -------
+        r_cm : (2,) np.array<float>
+            the "arc's center of mass"
+
+        Notes
+        -----
+        A simple analytical form can be derived for general Bezier curves.
+        Suppose the curve was closed, so :math:`B(0) = B(1)`. Call the area
+        enclosed by :math:`B(t)` :math:`B_\text{int}`. The center of mass of
+        :math:`B_\text{int}` is defined by the expected value of the position
+        vector `\vec{r}`
+
+        .. math::
+
+            \vec{R}_\text{cm} = \int_{B_\text{int}} \vec{r} \left( \frac{1}{
+            \int_{B_\text{int}}} d\vec{r} \right) d\vec{r}
+
+        where :math:`(1/\text{Area}(B_\text{int})` can be interpreted as a
+        probability density.
+
+        In order to compute this integral, we choose two functions
+        :math:`F_0(x,y) = [x^2/2, 0]` and :math:`F_1(x,y) = [0, y^2/2]` such
+        that :math:`[\div \cdot F_0, \div \cdot F_1] = \vec{r}`. Then, applying
+        the divergence integral (componentwise), we get that
+
+        .. math::
+            \vec{R}_\text{cm} &= \oint_{B(t)} F \cdot \vec{n} dt \\
+            &= \int_0^1 \left[ \begin{array}{1}
+                B^{(0)}(t) \frac{dB^{(1)}(t)}{dt}  \\
+              - B^{(1)}(t) \frac{dB^{(0)}(t)}{dt}  \end{array} \right] dt
+
+        After expanding in Berstein polynomials and moving the integral inside
+        all the sums, we get that
+
+        .. math::
+            \vec{R}_\text{cm} = \frac{1}{6} \sum_{i,j=0}^n\sum_{k=0}^{n-1}
+                \frac{{n \choose i}{n \choose j}{{n-1} \choose k}}
+                     {{3n - 1} \choose {i + j + k}}
+                \left(\begin{array}{1}
+                    P^{(0)}_i P^{(0)}_j (P^{(1)}_{k+1} - P^{(1)}_k)
+                  - P^{(1)}_i P^{(1)}_j (P^{(0)}_{k+1} - P^{(0)}_k)
+                \right) \end{array}
+
+        where :math:`P_i = [P^{(0)}_i, P^{(1)}_i]` is the :math:`i`'th control
+        point of the curve and :math:`n` is the degree of the curve.
+        """
+        n = self.degree
+        r_cm = np.zeros(2)
+        P = self.control_points
+        dP = np.diff(P, axis=0)
+        Pn = np.array([[1, -1]])*dP[:, ::-1]  # n = [y, -x]
+        for i in range(n + 1):
+            for j in range(n + 1):
+                for k in range(n):
+                    r_cm += _comb(n, i) * _comb(n, j) * _comb(n - 1, k) \
+                            * P[i]*P[j]*Pn[k] / _comb(3*n - 1, i + j + k)
+        return r_cm/6
+
+    def arc_area(self):
+        r"""
+        (Signed) area swept out by ray from origin to curve.
+
+        Notes
+        -----
+        A simple, analytical formula is possible for arbitrary bezier curves.
+
+        Given a bezier curve B(t), in order to calculate the area of the arc
+        swept out by the ray from the origin to the curve, we simply need to
+        compute :math:`\frac{1}{2}\int_0^1 B(t) \cdot n(t) dt`, where
+        :math:`n(t) = u^{(1)}(t) \hat{x}_0 - u{(0)}(t) \hat{x}_1` is the normal
+        vector oriented away from the origin and :math:`u^{(i)}(t) =
+        \frac{d}{dt} B^{(i)}(t)` is the :math:`i`th component of the curve's
+        tangent vector.  (This formula can be found by applying the divergence
+        theorem to :math:`F(x,y) = [x, y]/2`, and calculates the *signed* area
+        for a counter-clockwise curve, by the right hand rule).
+
+        The control points of the curve are just its coefficients in a
+        Bernstein expansion, so if we let :math:`P_i = [P^{(0)}_i, P^{(1)}_i]`
+        be the :math:`i`'th control point, then
+
+        .. math::
+
+            \frac{1}{2}\int_0^1 B(t) \cdot n(t) dt
+                   &= \frac{1}{2}\int_0^1 B^{(0)}(t) \frac{d}{dt} B^{(1)}(t)
+                                        - B^{(1)}(t) \frac{d}{dt} B^{(0)}(t)
+                                        dt \\
+                   &= \frac{1}{2}\int_0^1
+                        \left( \sum_{j=0}^n P_j^{(0)} b_{j,n} \right)
+                        \left( n \sum_{k=0}^{n-1} (P_{k+1}^{(1)} -
+                               P_{k}^{(1)}) b_{j,n} \right)
+                      \\
+                      &\hspace{1em} - \left( \sum_{j=0}^n P_j^{(1)} b_{j,n}
+                        \right) \left( n \sum_{k=0}^{n-1} (P_{k+1}^{(0)}
+                                     - P_{k}^{(0)}) b_{j,n} \right)
+                      dt,
+
+        where :math:`b_{\nu, n}(t) = {n \choose \nu} t^\nu {(1 - t)}^{n-\nu}`
+        is the :math:`\nu`'th Bernstein polynomial of degree :math:`n`.
+
+        Grouping :math:`t^l(1-t)^m` terms together for each :math:`l`,
+        :math:`m`, we get that the integrand becomes
+
+        .. math::
+
+            \sum_{j=0}^n \sum_{k=0}^{n-1}
+                {n \choose j} {{n - 1} \choose k}
+                &\left[P_j^{(0)} (P_{k+1}^{(1)} - P_{k}^{(1)})
+                    - P_j^{(1)} (P_{k+1}^{(0)} - P_{k}^{(0)})\right] \\
+                &\hspace{1em}\times{}t^{j + k} {(1 - t)}^{2n - 1 - j - k}
+
+        or just
+
+        .. math::
+
+            \sum_{j=0}^n \sum_{k=0}^{n-1}
+                \frac{{n \choose j} {{n - 1} \choose k}}
+                        {{{2n - 1} \choose {j+k}}}
+                [P_j^{(0)} (P_{k+1}^{(1)} - P_{k}^{(1)})
+                    - P_j^{(1)} (P_{k+1}^{(0)} - P_{k}^{(0)})]
+                b_{j+k,2n-1}(t).
+
+        Interchanging sum and integral, and using the fact that :math:`\int_0^1
+        b_{\nu, n}(t) dt = \frac{1}{n + 1}`, we conclude that the
+        original integral  can
+        simply be written as
+
+        .. math::
+
+            \frac{1}{2}&\int_0^1 B(t) \cdot n(t) dt
+            \\
+            &= \frac{1}{4}\sum_{j=0}^n \sum_{k=0}^{n-1}
+              \frac{{n \choose j} {{n - 1} \choose k}}
+                    {{{2n - 1} \choose {j+k}}}
+              [P_j^{(0)} (P_{k+1}^{(1)} - P_{k}^{(1)})
+             - P_j^{(1)} (P_{k+1}^{(0)} - P_{k}^{(0)})]
+        """
+        n = self.degree
+        area = 0
+        P = self.control_points
+        dP = np.diff(P, axis=0)
+        for j in range(n + 1):
+            for k in range(n):
+                area += _comb(n, j)*_comb(n-1, k)/_comb(2*n - 1, j + k) \
+                        * (P[j, 0]*dP[k, 1] - P[j, 1]*dP[k, 0])
+        return (1/4)*area
+
+    def center_of_mass(self):
+        """Return the center of mass of the curve (not the filled curve!)
+
+        Notes
+        -----
+        Computed as the mean of the control points.
+        """
+        return np.mean(self._cpoints, axis=0)
+
+    @classmethod
+    def differentiate(cls, B):
+        """Return the derivative of a BezierSegment, itself a BezierSegment"""
+        dcontrol_points = B.degree*np.diff(B.control_points, axis=0)
+        return cls(dcontrol_points)
+
+    @property
+    def control_points(self):
+        """The control points of the curve."""
+        return self._cpoints
+
+    @property
+    def dimension(self):
+        """The dimension of the curve."""
+        return self._d
+
+    @property
+    def degree(self):
+        """The number of control points in the curve."""
+        return self._N - 1
+
+    @property
+    def polynomial_coefficients(self):
+        r"""The polynomial coefficients of the Bezier curve.
+
+        Returns
+        -------
+        coefs : float, (n+1, d) array_like
+            Coefficients after expanding in polynomial basis, where :math:`n`
+            is the degree of the bezier curve and :math:`d` its dimension.
+            These are the numbers (:math:`C_j`) such that the curve can be
+            written :math:`\sum_{j=0}^n C_j t^j`.
+
+        Notes
+        -----
+        The coefficients are calculated as
+
+        .. math::
+
+            {n \choose j} \sum_{i=0}^j (-1)^{i+j} {j \choose i} P_i
+
+        where :math:`P_i` are the control points of the curve.
+        """
+        n = self.degree
+        # matplotlib uses n <= 4. overflow plausible starting around n = 15.
+        if n > 10:
+            warnings.warn("Polynomial coefficients formula unstable for high "
+                          "order Bezier curves!", RuntimeWarning)
+        d = self.dimension
+        P = self.control_points
+        coefs = np.zeros((n+1, d))
+        for j in range(n+1):
+            i = np.arange(j+1)
+            prefactor = np.power(-1, i + j) * _comb(j, i)
+            prefactor = np.tile(prefactor, (d, 1)).T
+            coefs[j] = _comb(n, j) * np.sum(prefactor*P[i], axis=0)
+        return coefs
+
+    @property
+    def axis_aligned_extrema(self):
+        """
+        Return the location along the curve's interior where its partial
+        derivative is zero, along with the dimension along which it is zero for
+        each such instance.
+
+        Returns
+        -------
+        dims : int, array_like
+            dimension :math:`i` along which the corresponding zero occurs
+        dzeros : float, array_like
+            of same size as dims. the :math:`t` such that :math:`d/dx_i B(t) =
+            0`
+        """
+        n = self.degree
+        Cj = self.polynomial_coefficients
+        # much faster than .differentiate(self).polynomial_coefficients
+        dCj = np.atleast_2d(np.arange(1, n+1)).T * Cj[1:]
+        if len(dCj) == 0:
+            return np.array([]), np.array([])
+        dims = []
+        roots = []
+        for i, pi in enumerate(dCj.T):
+            r = np.roots(pi[::-1])
+            roots.append(r)
+            dims.append(i*np.ones_like(r))
+        roots = np.concatenate(roots)
+        dims = np.concatenate(dims)
+        in_range = np.isreal(roots) & (roots >= 0) & (roots <= 1)
+        return dims[in_range], np.real(roots)[in_range]
 
 
 def split_bezier_intersecting_with_closedpath(
@@ -222,69 +593,7 @@ def split_bezier_intersecting_with_closedpath(
     return _left, _right
 
 
-# matplotlib specific
-
-
-def split_path_inout(path, inside, tolerance=0.01, reorder_inout=False):
-    """
-    Divide a path into two segments at the point where ``inside(x, y)`` becomes
-    False.
-    """
-    path_iter = path.iter_segments()
-
-    ctl_points, command = next(path_iter)
-    begin_inside = inside(ctl_points[-2:])  # true if begin point is inside
-
-    ctl_points_old = ctl_points
-
-    iold = 0
-    i = 1
-
-    for ctl_points, command in path_iter:
-        iold = i
-        i += len(ctl_points) // 2
-        if inside(ctl_points[-2:]) != begin_inside:
-            bezier_path = np.concatenate([ctl_points_old[-2:], ctl_points])
-            break
-        ctl_points_old = ctl_points
-    else:
-        raise ValueError("The path does not intersect with the patch")
-
-    bp = bezier_path.reshape((-1, 2))
-    left, right = split_bezier_intersecting_with_closedpath(
-        bp, inside, tolerance)
-    if len(left) == 2:
-        codes_left = [Path.LINETO]
-        codes_right = [Path.MOVETO, Path.LINETO]
-    elif len(left) == 3:
-        codes_left = [Path.CURVE3, Path.CURVE3]
-        codes_right = [Path.MOVETO, Path.CURVE3, Path.CURVE3]
-    elif len(left) == 4:
-        codes_left = [Path.CURVE4, Path.CURVE4, Path.CURVE4]
-        codes_right = [Path.MOVETO, Path.CURVE4, Path.CURVE4, Path.CURVE4]
-    else:
-        raise AssertionError("This should never be reached")
-
-    verts_left = left[1:]
-    verts_right = right[:]
-
-    if path.codes is None:
-        path_in = Path(np.concatenate([path.vertices[:i], verts_left]))
-        path_out = Path(np.concatenate([verts_right, path.vertices[i:]]))
-
-    else:
-        path_in = Path(np.concatenate([path.vertices[:iold], verts_left]),
-                       np.concatenate([path.codes[:iold], codes_left]))
-
-        path_out = Path(np.concatenate([verts_right, path.vertices[i:]]),
-                        np.concatenate([codes_right, path.codes[i:]]))
-
-    if reorder_inout and not begin_inside:
-        path_in, path_out = path_out, path_in
-
-    return path_in, path_out
-
-
+@cbook.deprecated("3.3")
 def inside_circle(cx, cy, r):
     """
     Return a function that checks whether a point is in a circle with center
@@ -294,15 +603,12 @@ def inside_circle(cx, cy, r):
 
         f(xy: Tuple[float, float]) -> bool
     """
-    r2 = r ** 2
-
-    def _f(xy):
-        x, y = xy
-        return (x - cx) ** 2 + (y - cy) ** 2 < r2
-    return _f
+    from .patches import _inside_circle
+    return _inside_circle(cx, cy, r)
 
 
 # quadratic Bezier lines
+
 
 def get_cos_sin(x0, y0, x1, y1):
     dx, dy = x1 - x0, y1 - y0
@@ -486,6 +792,7 @@ def make_path_regular(p):
     with ``codes`` set to (MOVETO, LINETO, LINETO, ..., LINETO); otherwise
     return *p* itself.
     """
+    from .path import Path
     c = p.codes
     if c is None:
         c = np.full(len(p.vertices), Path.LINETO, dtype=Path.code_type)
@@ -498,6 +805,5 @@ def make_path_regular(p):
 @cbook.deprecated("3.3", alternative="Path.make_compound_path()")
 def concatenate_paths(paths):
     """Concatenate a list of paths into a single path."""
-    vertices = np.concatenate([p.vertices for p in paths])
-    codes = np.concatenate([make_path_regular(p).codes for p in paths])
-    return Path(vertices, codes)
+    from .path import Path
+    return Path.make_compound_path(*paths)

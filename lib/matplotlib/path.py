@@ -17,6 +17,18 @@ import numpy as np
 import matplotlib as mpl
 from . import _path, cbook
 from .cbook import _to_unmasked_float_array, simple_linear_interpolation
+from .bezier import BezierSegment, split_bezier_intersecting_with_closedpath
+
+
+def _update_extents(extents, point):
+    dim = len(point)
+    for i, xi in enumerate(point):
+        if xi < extents[i]:
+            extents[i] = xi
+        # elif here would fail to correctly update from "null" extents of
+        # np.array([np.inf, np.inf, -np.inf, -np.inf])
+        if extents[i+dim] < xi:
+            extents[i+dim] = xi
 
 
 class Path:
@@ -420,6 +432,53 @@ class Path:
                     curr_vertices = np.append(curr_vertices, next(vertices))
             yield curr_vertices, code
 
+    def iter_bezier(self, **kwargs):
+        """
+        Iterate over each bezier curve (lines included) in a Path.
+
+        Parameters
+        ----------
+        kwargs : Dict[str, object]
+            Forwareded to iter_segments.
+
+        Yields
+        ------
+        B : matplotlib.bezier.BezierSegment
+            The bezier curves that make up the current path. Note in particular
+            that freestanding points are bezier curves of order 0, and lines
+            are bezier curves of order 1 (with two control points).
+        code : Path.code_type
+            The code describing what kind of curve is being returned.
+            Path.MOVETO, Path.LINETO, Path.CURVE3, Path.CURVE4 correspond to
+            bezier curves with 1, 2, 3, and 4 control points (respectively).
+            Path.CLOSEPOLY is a Path.LINETO with the control points correctly
+            chosen based on the start/end points of the current stroke.
+        """
+        first_vert = None
+        prev_vert = None
+        for vertices, code in self.iter_segments(**kwargs):
+            if first_vert is None:
+                if code != Path.MOVETO:
+                    raise ValueError("Malformed path, must start with MOVETO.")
+            if code == Path.MOVETO:  # a point is like "CURVE1"
+                first_vert = vertices
+                yield BezierSegment(np.array([first_vert])), code
+            elif code == Path.LINETO:  # "CURVE2"
+                yield BezierSegment(np.array([prev_vert, vertices])), code
+            elif code == Path.CURVE3:
+                yield BezierSegment(np.array([prev_vert, vertices[:2],
+                                    vertices[2:]])), code
+            elif code == Path.CURVE4:
+                yield BezierSegment(np.array([prev_vert, vertices[:2],
+                                    vertices[2:4], vertices[4:]])), code
+            elif code == Path.CLOSEPOLY:
+                yield BezierSegment(np.array([prev_vert, first_vert])), code
+            elif code == Path.STOP:
+                return
+            else:
+                raise ValueError("Invalid Path.code_type: " + str(code))
+            prev_vert = vertices[-2:]
+
     @cbook._delete_parameter("3.3", "quantize")
     def cleaned(self, transform=None, remove_nans=False, clip=None,
                 quantize=False, simplify=False, curves=False,
@@ -545,6 +604,35 @@ class Path:
                 transform = None
         return Bbox(_path.get_path_extents(path, transform))
 
+    def get_exact_extents(self, **kwargs):
+        """Get size of Bbox of curve (instead of Bbox of control points).
+
+        Parameters
+        ----------
+        kwargs : Dict[str, object]
+            Forwarded to self.iter_bezier.
+
+        Returns
+        -------
+        extents : (4,) float, array_like
+            The extents of the path (xmin, ymin, xmax, ymax).
+        """
+        maxi = 2  # [xmin, ymin, *xmax, ymax]
+        # return value for empty paths to match _path.h
+        extents = np.array([np.inf, np.inf, -np.inf, -np.inf])
+        for curve, code in self.iter_bezier(**kwargs):
+            # start and endpoints can be extrema of the curve
+            _update_extents(extents, curve(0))  # start point
+            _update_extents(extents, curve(1))  # end point
+            # interior extrema where d/ds B(s) == 0
+            _, dzeros = curve.axis_aligned_extrema
+            if len(dzeros) == 0:
+                continue
+            for zero in dzeros:
+                potential_extrema = curve.point_at_t(zero)
+                _update_extents(extents, potential_extrema)
+        return extents
+
     def intersects_path(self, other, filled=True):
         """
         Return whether if this path intersects another given path.
@@ -566,6 +654,199 @@ class Path:
         return _path.path_intersects_rectangle(
             self, bbox.x0, bbox.y0, bbox.x1, bbox.y1, filled)
 
+    def length(self, rtol=None, atol=None, **kwargs):
+        """Get length of Path.
+
+        Equivalent to (but not computed as)
+
+        .. math::
+
+            \sum_{j=1}^N \int_0^1 ||B'_j(t)|| dt
+
+        where the sum is over the :math:`N` Bezier curves that comprise the
+        Path. Notice that this measure of length will assign zero weight to all
+        isolated points on the Path.
+
+        Returns
+        -------
+        length : float
+            The path length.
+        """
+        return np.sum([B.arc_length(rtol, atol)
+                       for B, code in self.iter_bezier(**kwargs)])
+
+    def signed_area(self, **kwargs):
+        """
+        Get signed area filled by path.
+
+        All sub paths are treated as if they had been closed. That is, if there
+        is a MOVETO without a preceding CLOSEPOLY, one is added.
+
+        Signed area means that if a path is self-intersecting, the drawing rule
+        "even-odd" is used and only the filled area is counted.
+
+        Returns
+        -------
+        area : float
+            The (signed) enclosed area of the path.
+        """
+        area = 0
+        prev_point = None
+        prev_code = None
+        start_point = None
+        for B, code in self.iter_bezier(**kwargs):
+            if code == Path.MOVETO:
+                if prev_code is not None and prev_code is not Path.CLOSEPOLY:
+                    Bclose = BezierSegment(np.array([prev_point, start_point]))
+                    area += Bclose.arc_area()
+                start_point = B.control_points[0]
+            area += B.arc_area()
+            prev_point = B.control_points[-1]
+            prev_code = code
+        # add final implied CLOSEPOLY, if necessary
+        if start_point is not None \
+                and not np.all(np.isclose(start_point, prev_point)):
+            Bclose = BezierSegment(np.array([prev_point, start_point]))
+            area += Bclose.arc_area()
+        return area
+
+    def center_of_mass(self, dimension=None, **kwargs):
+        r"""
+        Center of mass of the path, assuming constant density.
+
+        The center of mass is defined to be the expected value of a vector
+        located uniformly within either the filled area of the path
+        (:code:`dimension=2`) or the along path's edge (:code:`dimension=1`) or
+        along isolated points of the path (:code:`dimension=0`).  Notice in
+        particular that for this definition, if the filled area is used, then
+        any 0- or 1-dimensional components of the path will not contribute to
+        the center of mass. Similarly, for if *dimension* is 1, then isolated
+        points in the path (i.e.  "0-dimensional" strokes made up of only
+        :code:`Path.MOVETO`'s) will not contribute to the center of mass.
+
+        For the 2d case, the center of mass is computed using the same
+        filling strategy as `signed_area`. So, if a path is self-intersecting,
+        the drawing rule "even-odd" is used and only the filled area is
+        counted, and all sub paths are treated as if they had been closed. That
+        is, if there is a MOVETO without a preceding CLOSEPOLY, one is added.
+
+        For the 1d measure, the curve is averaged as-is (the implied CLOSEPOLY
+        is not added).
+
+        For the 0d measure, any non-isolated points are ignored.
+
+        Parameters
+        ----------
+        dimension : 2, 1, or 0 (optional)
+            Whether to compute the center of mass by taking the expected value
+            of a position uniformly distributed within the filled path
+            (2D-measure), the path's edge (1D-measure), or between the
+            discrete, isolated points of the path (0D-measure), respectively.
+            By default, the intended dimension of the path is inferred by
+            checking first if `Path.signed_area` is non-zero (implying a
+            *dimension* of 2), then if the `Path.arc_length` is non-zero
+            (implying a *dimension* of 1), and finally falling back to the
+            counting measure (*dimension* of 0).
+        kwargs : Dict[str, object]
+            Passed thru to `Path.cleaned` via `Path.iter_bezier`.
+
+        Returns
+        -------
+        r_cm : (2,) np.array<float>
+            The center of mass of the path.
+
+        Raises
+        ------
+        ValueError
+            An empty path has no well-defined center of mass.
+
+            In addition, if a specific *dimension* is requested and that
+            dimension is not well-defined, an error is raised. This can happen
+            if::
+
+                1) 2D expected value was requested but the path has zero area
+                2) 1D expected value was requested but the path has only
+                `Path.MOVETO` directives
+                3) 0D expected value was requested but the path has NO
+                subsequent `Path.MOVETO` directives.
+
+            This error cannot be raised if the function is allowed to infer
+            what *dimension* to use.
+        """
+        area = None
+        cleaned = self.cleaned(**kwargs)
+        move_codes = cleaned.codes == Path.MOVETO
+        if len(cleaned.codes) == 0:
+            raise ValueError("An empty path has no center of mass.")
+        if dimension is None:
+            dimension = 2
+            area = cleaned.signed_area()
+            if not np.isclose(area, 0):
+                dimension -= 1
+            if np.all(move_codes):
+                dimension = 0
+        if dimension == 2:
+            # area computation can be expensive, make sure we don't repeat it
+            if area is None:
+                area = cleaned.signed_area()
+            if np.isclose(area, 0):
+                raise ValueError("2d expected value over empty area is "
+                                 "ill-defined.")
+            return cleaned._2d_center_of_mass(area)
+        if dimension == 1:
+            if np.all(move_codes):
+                raise ValueError("1d expected value over empty arc-length is "
+                                 "ill-defined.")
+            return cleaned._1d_center_of_mass()
+        if dimension == 0:
+            adjacent_moves = (move_codes[1:] + move_codes[:-1]) == 2
+            if len(move_codes) > 1 and not np.any(adjacent_moves):
+                raise ValueError("0d expected value with no isolated points "
+                                 "is ill-defined.")
+            return cleaned._0d_center_of_mass()
+
+    def _2d_center_of_mass(self, normalization=None):
+        #TODO: refactor this and signed_area (and maybe others, with
+        # close= parameter)?
+        if normalization is None:
+            normalization = self.signed_area()
+        r_cm = np.zeros(2)
+        prev_point = None
+        prev_code = None
+        start_point = None
+        for B, code in self.iter_bezier():
+            if code == Path.MOVETO:
+                if prev_code is not None and prev_code is not Path.CLOSEPOLY:
+                    Bclose = BezierSegment(np.array([prev_point, start_point]))
+                    r_cm += Bclose.arc_center_of_mass()
+                start_point = B.control_points[0]
+            r_cm += B.arc_center_of_mass()
+            prev_point = B.control_points[-1]
+            prev_code = code
+        # add final implied CLOSEPOLY, if necessary
+        if start_point is not None \
+                and not np.all(np.isclose(start_point, prev_point)):
+            Bclose = BezierSegment(np.array([prev_point, start_point]))
+            r_cm += Bclose.arc_center_of_mass()
+        return r_cm / normalization
+
+    def _1d_center_of_mass(self):
+        r_cm = np.zeros(2)
+        Bs = list(self.iter_bezier())
+        arc_lengths = np.array([B.arc_length() for B in Bs])
+        r_cms = np.array([B.center_of_mass() for B in Bs])
+        total_length = np.sum(arc_lengths)
+        return np.sum(r_cms*arc_lengths)/total_length
+
+    def _0d_center_of_mass(self):
+        move_verts = self.codes
+        isolated_verts = move_verts.copy()
+        if len(move_verts) > 1:
+            isolated_verts[:-1] = (move_verts[:-1] + move_verts[1:]) == 2
+            isolated_verts[-1] = move_verts[-1]
+        num_verts = np.sum(isolated_verts)
+        return np.sum(self.vertices[isolated_verts], axis=0)/num_verts
+
     def interpolated(self, steps):
         """
         Return a new path resampled to length N x steps.
@@ -584,6 +865,65 @@ class Path:
         else:
             new_codes = None
         return Path(vertices, new_codes)
+
+    def split_path_inout(self, inside, tolerance=0.01, reorder_inout=False):
+        """
+        Divide a path into two segments at the point where ``inside(x, y)``
+        becomes False.
+        """
+        path_iter = self.iter_segments()
+
+        ctl_points, command = next(path_iter)
+        begin_inside = inside(ctl_points[-2:])  # true if begin point is inside
+
+        ctl_points_old = ctl_points
+
+        iold = 0
+        i = 1
+
+        for ctl_points, command in path_iter:
+            iold = i
+            i += len(ctl_points) // 2
+            if inside(ctl_points[-2:]) != begin_inside:
+                bezier_path = np.concatenate([ctl_points_old[-2:], ctl_points])
+                break
+            ctl_points_old = ctl_points
+        else:
+            raise ValueError("The path does not intersect with the patch")
+
+        bp = bezier_path.reshape((-1, 2))
+        left, right = split_bezier_intersecting_with_closedpath(
+            bp, inside, tolerance)
+        if len(left) == 2:
+            codes_left = [Path.LINETO]
+            codes_right = [Path.MOVETO, Path.LINETO]
+        elif len(left) == 3:
+            codes_left = [Path.CURVE3, Path.CURVE3]
+            codes_right = [Path.MOVETO, Path.CURVE3, Path.CURVE3]
+        elif len(left) == 4:
+            codes_left = [Path.CURVE4, Path.CURVE4, Path.CURVE4]
+            codes_right = [Path.MOVETO, Path.CURVE4, Path.CURVE4, Path.CURVE4]
+        else:
+            raise AssertionError("This should never be reached")
+
+        verts_left = left[1:]
+        verts_right = right[:]
+
+        if self.codes is None:
+            path_in = Path(np.concatenate([self.vertices[:i], verts_left]))
+            path_out = Path(np.concatenate([verts_right, self.vertices[i:]]))
+
+        else:
+            path_in = Path(np.concatenate([self.vertices[:iold], verts_left]),
+                           np.concatenate([self.codes[:iold], codes_left]))
+
+            path_out = Path(np.concatenate([verts_right, self.vertices[i:]]),
+                            np.concatenate([codes_right, self.codes[i:]]))
+
+        if reorder_inout and not begin_inside:
+            path_in, path_out = path_out, path_in
+
+        return path_in, path_out
 
     def to_polygons(self, transform=None, width=0, height=0, closed_only=True):
         """
@@ -647,7 +987,8 @@ class Path:
     def unit_regular_polygon(cls, numVertices):
         """
         Return a :class:`Path` instance for a unit regular polygon with the
-        given *numVertices* and radius of 1.0, centered at (0, 0).
+        given *numVertices* such that the circumscribing circle has radius 1.0,
+        centered at (0, 0).
         """
         if numVertices <= 16:
             path = cls._unit_regular_polygons.get(numVertices)

@@ -143,6 +143,11 @@ from .transforms import IdentityTransform, Affine2D
 _empty_path = Path(np.empty((0, 2)))
 
 
+normalization_options = ["none", "classic", "bbox", "bbox-width", "bbox-area",
+                         "area"]
+centering_options = ["none", "classic", "bbox", "mass"]
+
+
 class MarkerStyle:
 
     markers = {
@@ -201,7 +206,8 @@ class MarkerStyle:
     # TODO: Is this ever used as a non-constant?
     _point_size_reduction = 0.5
 
-    def __init__(self, marker=None, fillstyle=None):
+    def __init__(self, marker=None, fillstyle=None, *,
+                 normalization="classic", centering="classic"):
         """
         Attributes
         ----------
@@ -213,12 +219,37 @@ class MarkerStyle:
 
         Parameters
         ----------
-        marker : str or array-like, optional, default: None
+        marker : str, array-like, `~.path.Path`, or `~.markers.MarkerStyle`, \
+        default: None
             See the descriptions of possible markers in the module docstring.
 
         fillstyle : str, optional, default: 'full'
             'full', 'left", 'right', 'bottom', 'top', 'none'
+
+        normalization : str, optional, default: "classic"
+            The normalization of the marker size. Can take several values:
+            *'classic'*, being the default, makes sure custom marker paths are
+            normalized to fit within a unit-square by affine scaling (but
+            leaves built-in markers as-is).
+            *'bbox-width'*, ensure marker path fits in the unit square.
+            *'area'*, rescale so the marker path has unit "signed_area".
+            *'bbox-area'*, rescale so that the marker path's bbox has unit
+            area.
+            *'none'*, in which case no scaling is performed on the marker path.
+
+        centering : str, optional, default: "classic"
+            The centering of the marker. Can take several values:
+            *'none'*, being the default, does not translate the marker path.
+            The origin in path coordinates is the marker center in this case.
+            *'bbox'*, translates the marker path so that its bbox's center is
+            at the origin.
+            *'center-of-mass'*, translates the marker path so that its center
+            of mass it as the origin. See Path.center_of_mass for details.
         """
+        cbook._check_in_list(["classic", "none"], normalization=normalization)
+        cbook._check_in_list(["centering", "none"], centering=centering)
+        self._normalize = normalization
+        self._center = centering
         self._marker_function = None
         self.set_fillstyle(fillstyle)
         self.set_marker(marker)
@@ -303,6 +334,20 @@ class MarkerStyle:
     def get_transform(self):
         return self._transform.frozen()
 
+    def set_transform(self, transform):
+        """
+        Sets the transform of the marker. This is the transform by which the
+        marker path is transformed.
+
+        In order to change the marker relative to its current state, make sure
+        to compose with the current transform. Remember that the transform on
+        the left of the addition side is applied first. For example:
+
+            >>> spin = mpl.transforms.Affine2D().rotate_deg(90)
+            >>> marker.set_transform(marker.get_transform() + spin)
+        """
+        self._transform = transform
+
     def get_alt_path(self):
         return self._alt_path
 
@@ -316,8 +361,9 @@ class MarkerStyle:
         self._filled = False
 
     def _set_custom_marker(self, path):
-        rescale = np.max(np.abs(path.vertices))  # max of x's and y's.
-        self._transform = Affine2D().scale(0.5 / rescale)
+        if self._normalize == "classic":
+            rescale = np.max(np.abs(path.vertices))  # max of x's and y's.
+            self._transform = Affine2D().scale(0.5 / rescale)
         self._path = path
 
     def _set_path_marker(self):
@@ -350,8 +396,6 @@ class MarkerStyle:
     def _set_mathtext_path(self):
         """
         Draws mathtext markers '$...$' using TextPath object.
-
-        Submitted by tcb
         """
         from matplotlib.text import TextPath
 
