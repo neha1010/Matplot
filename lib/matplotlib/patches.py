@@ -603,10 +603,10 @@ class Patch(artist.Artist):
     def get_window_extent(self, renderer=None):
         return self.get_path().get_extents(self.get_transform())
 
-    def _convert_xy_units(self, xy):
+    def _convert_xy_to_numeric(self, xy):
         """Convert x and y units for a tuple (x, y)."""
-        x = self.convert_xunits(xy[0])
-        y = self.convert_yunits(xy[1])
+        x = self.convert_x_to_numeric(xy[0])
+        y = self.convert_y_to_numeric(xy[1])
         return x, y
 
 
@@ -766,7 +766,7 @@ class Rectangle(Patch):
         call the accessor method and not directly access the transformation
         member variable.
         """
-        x0, y0, x1, y1 = self._convert_units()
+        x0, y0, x1, y1 = self._convert_to_numeric()
         bbox = transforms.Bbox.from_extents(x0, y0, x1, y1)
         rot_trans = transforms.Affine2D()
         rot_trans.rotate_deg_around(x0, y0, self.angle)
@@ -779,12 +779,10 @@ class Rectangle(Patch):
     def _update_y1(self):
         self._y1 = self._y0 + self._height
 
-    def _convert_units(self):
+    def _convert_to_numeric(self):
         """Convert bounds of the rectangle."""
-        x0 = self.convert_xunits(self._x0)
-        y0 = self.convert_yunits(self._y0)
-        x1 = self.convert_xunits(self._x1)
-        y1 = self.convert_yunits(self._y1)
+        x0, x1 = self.convert_x_to_numeric([self._x0, self._x1])
+        y0, y1 = self.convert_y_to_numeric([self._y0, self._y1])
         return x0, y0, x1, y1
 
     def get_patch_transform(self):
@@ -873,7 +871,7 @@ class Rectangle(Patch):
 
     def get_bbox(self):
         """Return the `.Bbox`."""
-        x0, y0, x1, y1 = self._convert_units()
+        x0, y0, x1, y1 = self._convert_to_numeric()
         return transforms.Bbox.from_extents(x0, y0, x1, y1)
 
     xy = property(get_xy, set_xy)
@@ -1404,10 +1402,10 @@ class Ellipse(Patch):
         call the accessor method and not directly access the transformation
         member variable.
         """
-        center = (self.convert_xunits(self._center[0]),
-                  self.convert_yunits(self._center[1]))
-        width = self.convert_xunits(self._width)
-        height = self.convert_yunits(self._height)
+        center = (self.convert_x_to_numeric(self._center[0]),
+                  self.convert_y_to_numeric(self._center[1]))
+        width = self.convert_x_to_numeric(self._width)
+        height = self.convert_y_to_numeric(self._height)
         self._patch_transform = transforms.Affine2D() \
             .scale(width * 0.5, height * 0.5) \
             .rotate_deg(self.angle) \
@@ -1650,8 +1648,8 @@ class Arc(Ellipse):
 
         self._recompute_transform()
 
-        width = self.convert_xunits(self.width)
-        height = self.convert_yunits(self.height)
+        width = self.convert_x_to_numeric(self.width)
+        height = self.convert_y_to_numeric(self.height)
 
         # If the width and height of ellipse are not equal, take into account
         # stretching when calculating angles to draw between
@@ -4129,8 +4127,8 @@ default: 'arc3'
         dpi_cor = self.get_dpi_cor()
 
         if self._posA_posB is not None:
-            posA = self._convert_xy_units(self._posA_posB[0])
-            posB = self._convert_xy_units(self._posA_posB[1])
+            posA = self._convert_xy_to_numeric(self._posA_posB[0])
+            posB = self._convert_xy_to_numeric(self._posA_posB[1])
             (posA, posB) = self.get_transform().transform((posA, posB))
             _path = self.get_connectionstyle()(posA, posB,
                                                patchA=self.patchA,
@@ -4293,8 +4291,8 @@ class ConnectionPatch(FancyArrowPatch):
 
         if s == 'data':
             trans = axes.transData
-            x = float(self.convert_xunits(x))
-            y = float(self.convert_yunits(y))
+            x = float(self.convert_x_to_numeric(x))
+            y = float(self.convert_y_to_numeric(y))
             return trans.transform((x, y))
         elif s == 'offset points':
             # convert the data point
