@@ -104,10 +104,8 @@ def ortho_transformation(zfront, zback):
 
 def _proj_transform_vec(vec, M):
     vecw = np.dot(M, vec)
-    w = vecw[3]
     # clip here..
-    txs, tys, tzs = vecw[0]/w, vecw[1]/w, vecw[2]/w
-    return txs, tys, tzs
+    return vecw[:3] / vecw[3]
 
 
 def _proj_transform_vec_clip(vec, M):
@@ -145,6 +143,29 @@ def proj_transform(xs, ys, zs, M):
 
 
 transform = proj_transform
+
+
+def _proj_transform_vectors(vecs, M):
+    """Vectorized version of ``_proj_transform_vec``.
+
+    Parameters
+    ----------
+    vecs : ... x 3 np.ndarray
+        Input vectors
+
+    M : 4 x 4 np.ndarray
+        Projection matrix
+    """
+    vecs_shape = vecs.shape
+    vecs = vecs.reshape(-1, 3).T
+
+    vecs_pad = np.empty((vecs.shape[0] + 1,) + vecs.shape[1:])
+    vecs_pad[:-1] = vecs
+    vecs_pad[-1] = 1
+    product = np.dot(M, vecs_pad)
+    tvecs = product[:3] / product[3]
+
+    return tvecs.T.reshape(vecs_shape)
 
 
 def proj_transform_clip(xs, ys, zs, M):
