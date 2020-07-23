@@ -620,11 +620,21 @@ class _LazyTickList:
             if self._major:
                 instance.majorTicks = []
                 tick = instance._get_tick(major=True)
+                try:
+                    tick.set_clip_path(instance.axes.patch)
+                except AttributeError:
+                    pass
+                tick._apply_params(**instance._major_tick_kw)
                 instance.majorTicks.append(tick)
                 return instance.majorTicks
             else:
                 instance.minorTicks = []
                 tick = instance._get_tick(major=False)
+                try:
+                    tick.set_clip_path(instance.axes.patch)
+                except AttributeError:
+                    pass
+                tick._apply_params(**instance._minor_tick_kw)
                 instance.minorTicks.append(tick)
                 return instance.minorTicks
 
@@ -716,6 +726,12 @@ class Axis(martist.Artist):
     # descriptor to make the tick lists lazy and instantiate them as needed.
     majorTicks = _LazyTickList(major=True)
     minorTicks = _LazyTickList(major=False)
+
+    def _lazy_get_ticks_or_empty(self, *, major=True):
+        # Return ticks without triggering auto-instantiation.  This is
+        # important for performance!
+        name = "majorTicks" if major else "minorTicks"
+        return vars(self).get(name, [])
 
     def get_remove_overlapping_locs(self):
         return self._remove_overlapping_locs
@@ -839,11 +855,11 @@ class Axis(martist.Artist):
         else:
             if which in ['major', 'both']:
                 self._major_tick_kw.update(kwtrans)
-                for tick in self.majorTicks:
+                for tick in self._lazy_get_ticks_or_empty(major=True):
                     tick._apply_params(**kwtrans)
             if which in ['minor', 'both']:
                 self._minor_tick_kw.update(kwtrans)
-                for tick in self.minorTicks:
+                for tick in self._lazy_get_ticks_or_empty(major=False):
                     tick._apply_params(**kwtrans)
             # labelOn and labelcolor also apply to the offset text.
             if 'label1On' in kwtrans or 'label2On' in kwtrans:
@@ -902,7 +918,8 @@ class Axis(martist.Artist):
 
     def set_clip_path(self, clippath, transform=None):
         martist.Artist.set_clip_path(self, clippath, transform)
-        for child in self.majorTicks + self.minorTicks:
+        for child in (self._lazy_get_ticks_or_empty(major=True)
+                      + self._lazy_get_ticks_or_empty(major=False)):
             child.set_clip_path(clippath, transform)
         self.stale = True
 
