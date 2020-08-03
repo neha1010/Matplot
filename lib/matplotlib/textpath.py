@@ -269,7 +269,7 @@ class TextToPath:
             glyph_ids.append(char_id)
             xpositions.append(x1)
             ypositions.append(y1)
-            sizes.append(dvifont.size / self.FONT_SCALE)
+            sizes.append(1)
 
         myrects = []
 
