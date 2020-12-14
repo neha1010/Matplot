@@ -19,13 +19,16 @@ import logging
 from numbers import Number
 import operator
 import re
+import warnings
 
 import numpy as np
 
 from matplotlib import _api, animation, cbook
 from matplotlib.cbook import ls_mapper
-from matplotlib.fontconfig_pattern import parse_fontconfig_pattern
 from matplotlib.colors import is_color_like
+from matplotlib.fontconfig_pattern import parse_fontconfig_pattern
+from matplotlib.hatch import Hatch
+from matplotlib._types import JoinStyle, CapStyle
 
 # Don't let the original cycler collide with our validating cycler
 from cycler import Cycler, cycler as ccycler
@@ -571,41 +574,10 @@ def _validate_linestyle(ls):
     raise ValueError(f"linestyle {ls!r} is not a valid on-off ink sequence.")
 
 
-def _deprecate_case_insensitive_join_cap(s):
-    s_low = s.lower()
-    if s != s_low:
-        if s_low in ['miter', 'round', 'bevel']:
-            cbook.warn_deprecated(
-                "3.3", message="Case-insensitive capstyles are deprecated "
-                "since %(since)s and support for them will be removed "
-                "%(removal)s; please pass them in lowercase.")
-        elif s_low in ['butt', 'round', 'projecting']:
-            cbook.warn_deprecated(
-                "3.3", message="Case-insensitive joinstyles are deprecated "
-                "since %(since)s and support for them will be removed "
-                "%(removal)s; please pass them in lowercase.")
-        # Else, error out at the check_in_list stage.
-    return s_low
-
-
-def validate_joinstyle(s):
-    s = _deprecate_case_insensitive_join_cap(s)
-    _api.check_in_list(['miter', 'round', 'bevel'], joinstyle=s)
-    return s
-
-
-def validate_capstyle(s):
-    s = _deprecate_case_insensitive_join_cap(s)
-    _api.check_in_list(['butt', 'round', 'projecting'], capstyle=s)
-    return s
-
-
 validate_fillstyle = ValidateInStrings(
     'markers.fillstyle', ['full', 'left', 'right', 'bottom', 'top', 'none'])
 
 
-validate_joinstylelist = _listify_validator(validate_joinstyle)
-validate_capstylelist = _listify_validator(validate_capstyle)
 validate_fillstylelist = _listify_validator(validate_fillstyle)
 
 
@@ -756,25 +728,6 @@ validate_grid_axis = ValidateInStrings(
     'axes.grid.axis', ['x', 'y', 'both'], _deprecated_since="3.3")
 
 
-def validate_hatch(s):
-    r"""
-    Validate a hatch pattern.
-    A hatch pattern string can have any sequence of the following
-    characters: ``\ / | - + * . x o O``.
-    """
-    if not isinstance(s, str):
-        raise ValueError("Hatch pattern must be a string")
-    cbook._check_isinstance(str, hatch_pattern=s)
-    unknown = set(s) - {'\\', '/', '|', '-', '+', '*', '.', 'x', 'o', 'O'}
-    if unknown:
-        raise ValueError("Unknown hatch symbol(s): %s" % list(unknown))
-    return s
-
-
-validate_hatchlist = _listify_validator(validate_hatch)
-validate_dashlist = _listify_validator(validate_floatlist)
-
-
 _prop_validators = {
         'color': _listify_validator(validate_color_for_prop_cycle,
                                     allow_stringlist=True),
@@ -782,8 +735,8 @@ _prop_validators = {
         'linestyle': _listify_validator(_validate_linestyle),
         'facecolor': validate_colorlist,
         'edgecolor': validate_colorlist,
-        'joinstyle': validate_joinstylelist,
-        'capstyle': validate_capstylelist,
+        'joinstyle': _listify_validator(JoinStyle),
+        'capstyle': _listify_validator(CapStyle),
         'fillstyle': validate_fillstylelist,
         'markerfacecolor': validate_colorlist,
         'markersize': validate_floatlist,
@@ -792,9 +745,11 @@ _prop_validators = {
         'markevery': validate_markeverylist,
         'alpha': validate_floatlist,
         'marker': validate_stringlist,
-        'hatch': validate_hatchlist,
-        'dashes': validate_dashlist,
+        'hatch': _listify_validator(Hatch),
+        'dashes': _listify_validator(validate_floatlist),
     }
+
+
 _prop_aliases = {
         'c': 'color',
         'lw': 'linewidth',
@@ -1000,6 +955,21 @@ def _convert_validator_spec(key, conv):
         return conv
 
 
+@_api.deprecated('3.4')
+def validate_hatch(s):
+    r"""
+    Validate a hatch pattern.
+    A hatch pattern string can have any sequence of the following
+    characters: ``\ / | - + * . x o O``.
+    """
+    with warnings.catch_warnings(record=True) as w:
+        # MatplotlibDeprecationWarning if the hatch pattern is invalid.
+        Hatch(s)
+        if len(w) > 0:
+            raise w[0]
+    return s
+
+
 # Mapping of rcParams to validators.
 # Converters given as lists or _ignorecase are converted to ValidateInStrings
 # immediately below.
@@ -1028,10 +998,10 @@ _validators = {
     "lines.markeredgewidth": validate_float,
     "lines.markersize":      validate_float,  # markersize, in points
     "lines.antialiased":     validate_bool,  # antialiased (no jaggies)
-    "lines.dash_joinstyle":  validate_joinstyle,
-    "lines.solid_joinstyle": validate_joinstyle,
-    "lines.dash_capstyle":   validate_capstyle,
-    "lines.solid_capstyle":  validate_capstyle,
+    "lines.dash_joinstyle":  JoinStyle,
+    "lines.solid_joinstyle": JoinStyle,
+    "lines.dash_capstyle":   CapStyle,
+    "lines.solid_capstyle":  CapStyle,
     "lines.dashed_pattern":  validate_floatlist,
     "lines.dashdot_pattern": validate_floatlist,
     "lines.dotted_pattern":  validate_floatlist,

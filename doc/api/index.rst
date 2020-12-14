@@ -93,6 +93,7 @@ Matplotlib consists of the following submodules:
    font_manager_api.rst
    fontconfig_pattern_api.rst
    gridspec_api.rst
+   hatch_api.rst
    image_api.rst
    legend_api.rst
    legend_handler_api.rst
@@ -124,6 +125,7 @@ Matplotlib consists of the following submodules:
    transformations.rst
    tri_api.rst
    type1font.rst
+   _types.rst
    units_api.rst
    widgets_api.rst
    _api_api.rst

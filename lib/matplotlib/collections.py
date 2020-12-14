@@ -15,7 +15,9 @@ import numpy as np
 
 import matplotlib as mpl
 from . import (_api, _path, artist, cbook, cm, colors as mcolors, docstring,
-               hatch as mhatch, lines as mlines, path as mpath, transforms)
+               lines as mlines, path as mpath, transforms)
+from .hatch import Hatch
+from ._types import JoinStyle, CapStyle
 import warnings
 
 
@@ -71,6 +73,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
     _edge_default = False
 
     @cbook._delete_parameter("3.3", "offset_position")
+    @docstring.interpd
     def __init__(self,
                  edgecolors=None,
                  facecolors=None,
@@ -110,14 +113,12 @@ class Collection(artist.Artist, cm.ScalarMappable):
             where *onoffseq* is an even length tuple of on and off ink lengths
             in points. For examples, see
             :doc:`/gallery/lines_bars_and_markers/linestyles`.
-        capstyle : str, default: :rc:`patch.capstyle`
+        capstyle : `.CapStyle`-like, default: :rc:`patch.capstyle`
             Style to use for capping lines for all paths in the collection.
-            See :doc:`/gallery/lines_bars_and_markers/joinstyle` for
-            a demonstration of each of the allowed values.
-        joinstyle : str, default: :rc:`patch.joinstyle`
+            Allowed values are %(CapStyle)s.
+        joinstyle : `.JoinStyle`-like, default: :rc:`patch.joinstyle`
             Style to use for joining lines for all paths in the collection.
-            See :doc:`/gallery/lines_bars_and_markers/joinstyle` for
-            a demonstration of each of the allowed values.
+            Allowed values are %(JoinStyle)s.
         antialiaseds : bool or list of bool, default: :rc:`patch.antialiased`
             Whether each patch in the collection should be drawn with
             antialiasing.
@@ -128,7 +129,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
         transOffset : `~.transforms.Transform`, default: `.IdentityTransform`
             A single transform which will be applied to each *offsets* vector
             before it is used.
-        offset_position : {'screen' (default), 'data' (deprecated)}
+        offset_position : {{'screen' (default), 'data' (deprecated)}}
             If set to 'data' (deprecated), *offsets* will be treated as if it
             is in data coordinates instead of in screen coordinates.
         norm : `~.colors.Normalize`, optional
@@ -139,10 +140,9 @@ class Collection(artist.Artist, cm.ScalarMappable):
             Forwarded to `.ScalarMappable`. The default of
             ``None`` will result in :rc:`image.cmap` being used.
         hatch : str, optional
-            Hatching pattern to use in filled paths, if any. Valid strings are
-            ['/', '\\', '|', '-', '+', 'x', 'o', 'O', '.', '*']. See
-            :doc:`/gallery/shapes_and_collections/hatch_style_reference` for
-            the meaning of each hatch type.
+            Hatching pattern to use in filled paths, if any. Primitives
+            available are %(Hatch)s. See `~.hatch.Hatch` for how to construct
+            more complex hatch patterns.
         pickradius : float, default: 5.0
             If ``pickradius <= 0``, then `.Collection.contains` will return
             ``True`` whenever the test point is inside of one of the polygons
@@ -492,44 +492,22 @@ class Collection(artist.Artist, cm.ScalarMappable):
 
     def set_hatch(self, hatch):
         r"""
-        Set the hatching pattern
-
-        *hatch* can be one of::
-
-          /   - diagonal hatching
-          \   - back diagonal
-          |   - vertical
-          -   - horizontal
-          +   - crossed
-          x   - crossed diagonal
-          o   - small circle
-          O   - large circle
-          .   - dots
-          *   - stars
-
-        Letters can be combined, in which case all the specified
-        hatchings are done.  If same letter repeats, it increases the
-        density of hatching of that pattern.
-
-        Hatching is supported in the PostScript, PDF, SVG and Agg
-        backends only.
-
-        Unlike other properties such as linewidth and colors, hatching
-        can only be specified for the collection as a whole, not separately
-        for each member.
+        Set the hatching pattern.
 
         Parameters
         ----------
-        hatch : {'/', '\\', '|', '-', '+', 'x', 'o', 'O', '.', '*'}
+        hatch : `.Hatch`-like or str
+            The built-in hatching patterns are %(Hatch)s. Multiple hatch types
+            can be combined (e.g. ``'|-'`` is equivalent to ``'+'``) and
+            repeating a character increases the density of that pattern. For
+            more advanced usage, see the `.Hatch` docs.
         """
-        # Use validate_hatch(list) after deprecation.
-        mhatch._validate_hatch_pattern(hatch)
-        self._hatch = hatch
+        self._hatch = Hatch(hatch)
         self.stale = True
 
     def get_hatch(self):
         """Return the current hatching pattern."""
-        return self._hatch
+        return self._hatch._pattern_spec
 
     def set_offsets(self, offsets):
         """
@@ -655,35 +633,33 @@ class Collection(artist.Artist, cm.ScalarMappable):
         self._linewidths, self._linestyles = self._bcast_lwls(
             self._us_lw, self._us_linestyles)
 
+    @docstring.interpd
     def set_capstyle(self, cs):
         """
-        Set the capstyle for the collection (for all its elements).
+        Set the `.CapStyle` for the collection (for all its elements).
 
         Parameters
         ----------
-        cs : {'butt', 'round', 'projecting'}
-            The capstyle.
+        cs : `.CapStyle` or %(CapStyle)s
         """
-        mpl.rcsetup.validate_capstyle(cs)
-        self._capstyle = cs
+        self._capstyle = CapStyle(cs)
 
     def get_capstyle(self):
-        return self._capstyle
+        return self._capstyle.name
 
+    @docstring.interpd
     def set_joinstyle(self, js):
         """
-        Set the joinstyle for the collection (for all its elements).
+        Set the `.JoinStyle` for the collection (for all its elements).
 
         Parameters
         ----------
-        js : {'miter', 'round', 'bevel'}
-            The joinstyle.
+        js : `.JoinStyle` or %(JoinStyle)s
         """
-        mpl.rcsetup.validate_joinstyle(js)
-        self._joinstyle = js
+        self._joinstyle = JoinStyle(js)
 
     def get_joinstyle(self):
-        return self._joinstyle
+        return self._joinstyle.name
 
     @staticmethod
     def _bcast_lwls(linewidths, dashes):

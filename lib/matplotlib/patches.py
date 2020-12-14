@@ -9,13 +9,14 @@ from collections import namedtuple
 import numpy as np
 
 import matplotlib as mpl
-from . import (_api, artist, cbook, colors, docstring, hatch as mhatch,
-               lines as mlines, transforms)
+from . import (_api, artist, cbook, colors, docstring,
+               hatch as mhatch, lines as mlines, transforms)
 from .bezier import (
     NonIntersectingPathException, get_cos_sin, get_intersection,
     get_parallels, inside_circle, make_wedged_bezier2,
     split_bezier_intersecting_with_closedpath, split_path_inout)
 from .path import Path
+from ._types import JoinStyle, CapStyle
 
 
 @cbook._define_aliases({
@@ -74,9 +75,9 @@ class Patch(artist.Artist):
         if linestyle is None:
             linestyle = "solid"
         if capstyle is None:
-            capstyle = 'butt'
+            capstyle = CapStyle.butt
         if joinstyle is None:
-            joinstyle = 'miter'
+            joinstyle = JoinStyle.miter
         if antialiased is None:
             antialiased = mpl.rcParams['patch.antialiased']
 
@@ -471,32 +472,34 @@ class Patch(artist.Artist):
     # attribute.
     fill = property(get_fill, set_fill)
 
+    @docstring.interpd
     def set_capstyle(self, s):
         """
-        Set the capstyle.
+        Set the `.CapStyle`.
 
         Parameters
         ----------
-        s : {'butt', 'round', 'projecting'}
+        s : `.CapStyle` or %(CapStyle)s
         """
-        mpl.rcsetup.validate_capstyle(s)
-        self._capstyle = s
+        cs = CapStyle(s)
+        self._capstyle = cs
         self.stale = True
 
     def get_capstyle(self):
         """Return the capstyle."""
         return self._capstyle
 
+    @docstring.interpd
     def set_joinstyle(self, s):
         """
-        Set the joinstyle.
+        Set the `.JoinStyle`.
 
         Parameters
         ----------
-        s : {'miter', 'round', 'bevel'}
+        s : `.JoinStyle` or %(JoinStyle)s
         """
-        mpl.rcsetup.validate_joinstyle(s)
-        self._joinstyle = s
+        js = JoinStyle(s)
+        self._joinstyle = js
         self.stale = True
 
     def get_joinstyle(self):
@@ -507,38 +510,20 @@ class Patch(artist.Artist):
         r"""
         Set the hatching pattern.
 
-        *hatch* can be one of::
-
-          /   - diagonal hatching
-          \   - back diagonal
-          |   - vertical
-          -   - horizontal
-          +   - crossed
-          x   - crossed diagonal
-          o   - small circle
-          O   - large circle
-          .   - dots
-          *   - stars
-
-        Letters can be combined, in which case all the specified
-        hatchings are done.  If same letter repeats, it increases the
-        density of hatching of that pattern.
-
-        Hatching is supported in the PostScript, PDF, SVG and Agg
-        backends only.
-
         Parameters
         ----------
-        hatch : {'/', '\\', '|', '-', '+', 'x', 'o', 'O', '.', '*'}
+        hatch : `.Hatch`-like or str
+            The built-in hatching patterns are %(Hatch)s. Multiple hatch types
+            can be combined (e.g. ``'|-'`` is equivalent to ``'+'``) and
+            repeating a character increases the density of that pattern. For
+            more advanced usage, see the `.Hatch` docs.
         """
-        # Use validate_hatch(list) after deprecation.
-        mhatch._validate_hatch_pattern(hatch)
-        self._hatch = hatch
+        self._hatch = mhatch.Hatch(hatch)
         self.stale = True
 
     def get_hatch(self):
         """Return the hatching pattern."""
-        return self._hatch
+        return self._hatch._pattern_spec
 
     @contextlib.contextmanager
     def _bind_draw_path_function(self, renderer):
@@ -3970,8 +3955,8 @@ default: 'arc3'
             ``joinstyle`` for `FancyArrowPatch` are set to ``"round"``.
         """
         # Traditionally, the cap- and joinstyle for FancyArrowPatch are round
-        kwargs.setdefault("joinstyle", "round")
-        kwargs.setdefault("capstyle", "round")
+        kwargs.setdefault("joinstyle", JoinStyle.round)
+        kwargs.setdefault("capstyle", CapStyle.round)
 
         super().__init__(**kwargs)
 
