@@ -824,6 +824,8 @@ class Legend(Artist):
             List of `.Path` corresponding to each line.
         offsets
             List of (x, y) offsets of all collection.
+        texts
+            List of the axes bounding boxes of all texts.
         """
         assert self.isaxes  # always holds, as this is only called internally
         ax = self.parent
@@ -838,7 +840,11 @@ class Legend(Artist):
             _, transOffset, hoffsets, _ = handle._prepare_points()
             for offset in transOffset.transform(hoffsets):
                 offsets.append(offset)
-        return bboxes, lines, offsets
+
+        texts = [text.get_window_extent()
+                 for text in ax.texts]
+
+        return bboxes, lines, offsets, texts
 
     def get_children(self):
         # docstring inherited
@@ -1024,7 +1030,7 @@ class Legend(Artist):
 
         start_time = time.perf_counter()
 
-        bboxes, lines, offsets = self._auto_legend_data()
+        bboxes, lines, offsets, texts = self._auto_legend_data()
 
         bbox = Bbox.from_bounds(0, 0, width, height)
         if consider is None:
@@ -1040,11 +1046,12 @@ class Legend(Artist):
             # XXX TODO: If markers are present, it would be good to take them
             # into account when checking vertex overlaps in the next line.
             badness = (sum(legendBox.count_contains(line.vertices)
-                           for line in lines)
-                       + legendBox.count_contains(offsets)
-                       + legendBox.count_overlaps(bboxes)
-                       + sum(line.intersects_bbox(legendBox, filled=False)
-                             for line in lines))
+                           for line in lines) +
+                       legendBox.count_contains(offsets) +
+                       legendBox.count_overlaps(bboxes) +
+                       legendBox.count_overlaps(texts) +
+                       sum(line.intersects_bbox(legendBox, filled=False)
+                           for line in lines))
             if badness == 0:
                 return l, b
             # Include the index to favor lower codes in case of a tie.
