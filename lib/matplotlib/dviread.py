@@ -546,6 +546,9 @@ class DviFont:
     Attributes
     ----------
     texname : bytes
+    fname : str
+       Compatibility shim so that DviFont can be used with
+       ``_backend_pdf_ps.CharacterTracker``; not a real filename.
     size : float
        Size of the font in Adobe points, converted from the slightly
        smaller TeX points.
@@ -569,6 +572,11 @@ class DviFont:
             nchars = 0
         self.widths = [(1000*tfm.width.get(char, 0)) >> 20
                        for char in range(nchars)]
+
+    @property
+    def fname(self):
+        """A fake filename"""
+        return self.texname.decode('latin-1')
 
     def __eq__(self, other):
         return (type(self) == type(other)
