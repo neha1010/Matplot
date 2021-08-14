@@ -2791,7 +2791,6 @@ class RectangleSelector(_SelectorWidget):
         if self._active_handle is None:
             x = event.xdata
             y = event.ydata
-            self.visible = False
             self.extents = x, x, y, y
             self.visible = True
         else:
@@ -2804,25 +2803,13 @@ class RectangleSelector(_SelectorWidget):
         if not self._interactive:
             self._to_draw.set_visible(False)
 
-        # update the eventpress and eventrelease with the resulting extents
-        x0, x1, y0, y1 = self.extents
-        self._eventpress.xdata = x0
-        self._eventpress.ydata = y0
-        xy0 = self.ax.transData.transform([x0, y0])
-        self._eventpress.x, self._eventpress.y = xy0
-
-        self._eventrelease.xdata = x1
-        self._eventrelease.ydata = y1
-        xy1 = self.ax.transData.transform([x1, y1])
-        self._eventrelease.x, self._eventrelease.y = xy1
-
         # calculate dimensions of box or line
         if self.spancoords == 'data':
-            spanx = abs(self._eventpress.xdata - self._eventrelease.xdata)
-            spany = abs(self._eventpress.ydata - self._eventrelease.ydata)
+            spanx = abs(self._eventpress.xdata - event.xdata)
+            spany = abs(self._eventpress.ydata - event.ydata)
         elif self.spancoords == 'pixels':
-            spanx = abs(self._eventpress.x - self._eventrelease.x)
-            spany = abs(self._eventpress.y - self._eventrelease.y)
+            spanx = abs(self._eventpress.x - event.x)
+            spany = abs(self._eventpress.y - event.y)
         else:
             _api.check_in_list(['data', 'pixels'],
                                spancoords=self.spancoords)
@@ -2837,7 +2824,7 @@ class RectangleSelector(_SelectorWidget):
             return
 
         # call desired function
-        self.onselect(self._eventpress, self._eventrelease)
+        self.onselect(self._eventpress, event)
         self.update()
         self._active_handle = None
 

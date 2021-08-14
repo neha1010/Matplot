@@ -1,0 +1,6 @@
+``RectangleSelector`` ``onselect`` now reports actual mouse press and release coordinates
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The current docstrings in `.RectangleSelector` describe ``onselect`` as a function with the
+the signature ``def onselect(eclick: MouseEvent, erelease: MouseEvent)``. The
+previous behaviour reported the ``extent`` of the rectangle, not the mouse event
+coordinates. The new behaviour reports the actual mouse event coordinates.
