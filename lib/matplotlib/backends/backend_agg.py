@@ -35,7 +35,7 @@ from matplotlib import colors as mcolors
 from matplotlib.backend_bases import (
     _Backend, _check_savefig_extra_args, FigureCanvasBase, FigureManagerBase,
     RendererBase)
-from matplotlib.font_manager import findfont, get_font
+from matplotlib.font_manager import find_fontsprop, get_font
 from matplotlib.ft2font import (LOAD_FORCE_AUTOHINT, LOAD_NO_HINTING,
                                 LOAD_DEFAULT, LOAD_NO_AUTOHINT)
 from matplotlib.mathtext import MathTextParser
@@ -251,7 +251,7 @@ class RendererAgg(RendererBase):
         """
         Get the font for text instance t, caching for efficiency
         """
-        fname = findfont(prop)
+        fname = find_fontsprop(prop)
         font = get_font(fname)
 
         font.clear()

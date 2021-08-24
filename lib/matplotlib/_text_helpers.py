@@ -9,7 +9,7 @@ from .ft2font import KERNING_DEFAULT, LOAD_NO_HINTING
 
 
 LayoutItem = dataclasses.make_dataclass(
-    "LayoutItem", ["char", "glyph_idx", "x", "prev_kern"])
+    "LayoutItem", ["ft_object", "char", "glyph_idx", "x", "prev_kern"])
 
 
 def warn_on_missing_glyph(codepoint):
@@ -63,6 +63,7 @@ def layout(string, font, *, kern_mode=KERNING_DEFAULT):
                 if prev_glyph_idx is not None else 0.)
         x += kern
         glyph = font.load_glyph(glyph_idx, flags=LOAD_NO_HINTING)
-        yield LayoutItem(char, glyph_idx, x, kern)
+        ft_object = font.get_glyph_to_font().get(glyph_idx, font)
+        yield LayoutItem(ft_object, char, glyph_idx, x, kern)
         x += glyph.linearHoriAdvance / 65536
         prev_glyph_idx = glyph_idx
