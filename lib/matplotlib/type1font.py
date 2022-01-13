@@ -21,8 +21,10 @@ Sources:
   v1.1, 1993. ISBN 0-201-57044-0.
 """
 
+import base64
 import binascii
 import functools
+import itertools
 import logging
 import re
 import string
@@ -34,6 +36,35 @@ from matplotlib.cbook import _format_approx
 from . import _api
 
 _log = logging.getLogger(__name__)
+
+
+def _make_tag(set):
+    """
+    Hash set into a six-character tag made of uppercase letters
+
+    Useful for adding a tag into subsetted fonts while keeping the code
+    reproducible. The function always returns the same value for the
+    same set on the same exact Python version but is not guaranteed to
+    not have collisions.
+
+    Parameters
+    ----------
+    set : iterable
+        The set of glyphs present in a font subset
+
+    Returns
+    -------
+    str
+        Six uppercase ASCII letters and a plus sign
+    """
+
+    # freeze the set to make it hashable, interpret the hash as bytes
+    array = struct.pack("@q", hash(frozenset(set)))
+    # turn the bytes into characters with b32encode, which uses uppercase
+    # letters and numbers from 2 to 7 - remap those arbitrarily
+    trans = str.maketrans('234567', 'MTPLIB', '=')
+    return (base64.b32encode(array).decode('ascii')
+            .translate(trans)[:6] + '+')
 
 
 class _Token:
@@ -625,8 +656,7 @@ class Type1Font:
 
         return array, next(tokens).endpos()
 
-    @staticmethod
-    def _parse_charstrings(tokens, _data):
+    def _parse_charstrings(self, tokens, _data):
         count_token = next(tokens)
         if not count_token.is_number():
             raise RuntimeError(
@@ -648,7 +678,12 @@ class Type1Font:
                     f"Token following /{glyphname} in CharStrings definition "
                     f"must be a number, was {nbytes_token}"
                 )
-            next(tokens)  # usually RD or |-
+            token = next(tokens)
+            if not token.is_keyword(self._abbr['RD']):
+                raise RuntimeError(
+                    "Token preceding charstring must be {self._abbr['RD']}, "
+                    f"was {token}"
+                )
             binary_token = tokens.send(1+nbytes_token.value())
             charstrings[glyphname] = binary_token.value()
 
@@ -679,8 +714,7 @@ class Type1Font:
                 continue
             encoding[index_token.value()] = name_token.value()
 
-    @staticmethod
-    def _parse_othersubrs(tokens, data):
+    def _parse_othersubrs(self, tokens, data):
         init_pos = None
         while True:
             token = next(tokens)
@@ -688,7 +722,7 @@ class Type1Font:
                 init_pos = token.pos
             if token.is_delim():
                 _expression(token, tokens, data)
-            elif token.is_keyword('def', 'ND', '|-'):
+            elif token.is_keyword('def', self._abbr['ND']):
                 return data[init_pos:token.endpos()], token.endpos()
 
     def transform(self, effects):
@@ -743,7 +777,7 @@ class Type1Font:
         fontmatrix = (
             '[%s]' % ' '.join(_format_approx(x, 6) for x in array)
         )
-        replacements = (
+        newparts = self._replace(
             [(x, '/FontName/%s def' % fontname)
              for x in self._pos['FontName']]
             + [(x, '/ItalicAngle %a def' % italicangle)
@@ -753,11 +787,40 @@ class Type1Font:
             + [(x, '') for x in self._pos.get('UniqueID', [])]
         )
 
+        return Type1Font((
+            newparts[0],
+            self._encrypt(newparts[1], 'eexec'),
+            self.parts[2]
+        ))
+
+    def _replace(self, replacements):
+        """
+        Change the font according to `replacements`
+
+        Parameters
+        ----------
+        replacements : list of ((int, int), str)
+            Each element is ((pos0, pos1), replacement) where pos0 and
+            pos1 are indices to the original font data (parts[0] and the
+            decrypted part concatenated). The data in the interval
+            pos0:pos1 will be replaced by the replacement text. To
+            accommodate binary data, the replacement is taken to be in
+            Latin-1 encoding.
+
+            The case where pos0 is inside parts[0] and pos1 inside
+            the decrypted part is not supported.
+
+        Returns
+        -------
+        (bytes, bytes)
+            The new parts[0] and decrypted part (which needs to be
+            encrypted in the transformed font).
+        """
         data = bytearray(self.parts[0])
         data.extend(self.decrypted)
         len0 = len(self.parts[0])
         for (pos0, pos1), value in sorted(replacements, reverse=True):
-            data[pos0:pos1] = value.encode('ascii', 'replace')
+            data[pos0:pos1] = value.encode('latin-1')
             if pos0 < len(self.parts[0]):
                 if pos1 >= len(self.parts[0]):
                     raise RuntimeError(
@@ -767,11 +830,210 @@ class Type1Font:
                 len0 += len(value) - pos1 + pos0
 
         data = bytes(data)
+        return data[:len0], data[len0:]
+
+    def subset(self, characters):
+        """
+        Return a new font that only defines the given characters.
+
+        Parameters
+        ----------
+        characters : sequence of bytes
+            The subset of characters to include
+
+        Returns
+        -------
+        `Type1Font`
+        """
+
+        characters = set(characters)
+        encoding = {code: glyph
+                    for code, glyph in self.prop['Encoding'].items()
+                    if code in characters}
+        encoding[0] = '.notdef'
+        # todo and done include strings (glyph names)
+        todo = set(encoding.values())
+        done = set()
+        seen_subrs = {0, 1, 2, 3}
+        while todo - done:
+            glyph = next(iter(todo - done))
+            called_glyphs, called_subrs, _, _ = self._simulate(glyph, [], [])
+            todo.update(called_glyphs)
+            seen_subrs.update(called_subrs)
+            done.add(glyph)
+
+        fontname = _make_tag(todo) + self.prop['FontName']
+        charstrings = self._subset_charstrings(todo)
+        subrs = self._subset_subrs(seen_subrs)
+        newparts = self._replace(
+            [(x, '/FontName/%s def' % fontname)
+             for x in self._pos['FontName']]
+            + [(self._pos['CharStrings'][0], charstrings),
+               (self._pos['Subrs'][0], subrs),
+               (self._pos['Encoding'][0], self._subset_encoding(encoding))
+               ] + [(x, '') for x in self._pos.get('UniqueID', [])]
+        )
         return Type1Font((
-            data[:len0],
-            self._encrypt(data[len0:], 'eexec'),
+            newparts[0],
+            self._encrypt(newparts[1], 'eexec'),
             self.parts[2]
         ))
+
+    @staticmethod
+    def _charstring_tokens(data):
+        data = iter(data)
+        for byte in data:
+            if 32 <= byte <= 246:
+                yield byte - 139
+            elif 247 <= byte <= 250:
+                byte2 = next(data)
+                yield (byte-247) * 256 + byte2 + 108
+            elif 251 <= byte <= 254:
+                byte2 = next(data)
+                yield -(byte-251)*256 - byte2 - 108
+            elif byte == 255:
+                bs = bytes(itertools.islice(data, 4))
+                yield struct.unpack('>i', bs)[0]
+            elif byte == 12:
+                byte1 = next(data)
+                yield {
+                    0: 'dotsection',
+                    1: 'vstem3',
+                    2: 'hstem3',
+                    6: 'seac',
+                    7: 'sbw',
+                    12: 'div',
+                    16: 'callothersubr',
+                    17: 'pop',
+                    33: 'setcurrentpoint'
+                }[byte1]
+            else:
+                yield {
+                    1: 'hstem',
+                    3: 'vstem',
+                    4: 'vmoveto',
+                    5: 'rlineto',
+                    6: 'hlineto',
+                    7: 'vlineto',
+                    8: 'rrcurveto',
+                    9: 'closepath',
+                    10: 'callsubr',
+                    11: 'return',
+                    13: 'hsbw',
+                    14: 'endchar',
+                    21: 'rmoveto',
+                    22: 'hmoveto',
+                    30: 'vhcurveto',
+                    31: 'hvcurveto'
+                }[byte]
+
+    def _step(self, buildchar_stack, postscript_stack, opcode):
+        if isinstance(opcode, int):
+            return set(), set(), buildchar_stack + [opcode], postscript_stack
+        elif opcode in {
+                'hsbw', 'sbw', 'closepath', 'hlineto', 'hmoveto', 'hcurveto',
+                'hvcurveto', 'rlineto', 'rmoveto', 'rrcurveto', 'vhcurveto',
+                'vlineto', 'vmoveto', 'dotsection', 'hstem', 'hstem3', 'vstem',
+                'vstem3', 'setcurrentpoint'
+        }:
+            return set(), set(), [], postscript_stack
+        elif opcode == 'seac':
+            codes = buildchar_stack[3:5]
+            glyphs = [self.prop['Encoding'][x] for x in codes]
+            return set(glyphs), set(), [], postscript_stack
+        elif opcode == 'div':
+            num1, num2 = buildchar_stack[-2:]
+            return (
+                set(),
+                set(),
+                buildchar_stack[-2:] + [num1/num2], postscript_stack
+            )
+        elif opcode == 'callothersubr':
+            othersubr = buildchar_stack[-1]
+            n = buildchar_stack[-2]
+            args = buildchar_stack[-2-n:-2]
+            if othersubr == 3:  # Section 8.1 in Type-1 spec
+                postscript_stack.append(args[0])
+            else:
+                postscript_stack.extend(args[::-1])
+            return set(), set(), buildchar_stack[:-n-2], postscript_stack
+        elif opcode == 'callsubr':
+            subr = buildchar_stack[-1]
+            glyphs, subrs, new_bc_stack, new_ps_stack = \
+                self._simulate(subr, buildchar_stack[:-1], postscript_stack)
+            return set(), subrs | {subr}, new_bc_stack, new_ps_stack
+        elif opcode == 'pop':
+            return (
+                set(),
+                set(),
+                buildchar_stack + [postscript_stack[-1]], postscript_stack[:-1]
+            )
+        else:
+            raise RuntimeError(f'opcode {opcode}')
+
+    def _simulate(self, glyph_or_subr, buildchar_stack, postscript_stack):
+        if isinstance(glyph_or_subr, str):
+            program = self.prop['CharStrings'][glyph_or_subr]
+            glyphs = {glyph_or_subr}
+            subrs = set()
+        else:
+            program = self.prop['Subrs'][glyph_or_subr]
+            glyphs = set()
+            subrs = {glyph_or_subr}
+        for opcode in self._charstring_tokens(program):
+            if opcode in ('return', 'endchar'):
+                return glyphs, subrs, buildchar_stack, postscript_stack
+            newglyphs, newsubrs, buildchar_stack, postscript_stack = \
+                self._step(buildchar_stack, postscript_stack, opcode)
+            glyphs.update(newglyphs)
+            subrs.update(newsubrs)
+
+    def _subset_encoding(self, encoding):
+        result = [
+            '/Encoding 256 array\n0 1 255 { 1 index exch /.notdef put } for'
+        ]
+        result.extend(
+            f'dup {i} /{glyph} put'
+            for i, glyph in sorted(encoding.items())
+            if glyph != '.notdef'
+        )
+        result.append('readonly def\n')
+        return '\n'.join(result)
+
+    def _subset_charstrings(self, glyphs):
+        result = [f'/CharStrings {len(glyphs)} dict dup begin']
+        encrypted = [self._encrypt(self.prop['CharStrings'][glyph],
+                                   'charstring',
+                                   self.prop.get('lenIV', 4)
+                                   ).decode('latin-1')
+                     for glyph in glyphs]
+        RD, ND = self._abbr['RD'], self._abbr['ND']
+        result.extend(
+            f'/{glyph} {len(enc)} {RD} {enc} {ND}'
+            for glyph, enc in zip(glyphs, encrypted)
+        )
+        result.append('end\n')
+        return '\n'.join(result)
+
+    def _subset_subrs(self, indices):
+        # we can't remove subroutines, we just replace unused ones with a stub
+        n_subrs = len(self.prop['Subrs'])
+        result = [f'/Subrs {n_subrs} array']
+        lenIV = self.prop.get('lenIV', 4)
+        stub = self._encrypt(b'\x0b', 'charstring', lenIV).decode('latin-1')
+        encrypted = [
+            self._encrypt(self.prop['Subrs'][i], 'charstring', lenIV
+                          ).decode('latin-1')
+            if i in indices else stub
+            for i in range(n_subrs)
+        ]
+        RD, ND, NP = self._abbr['RD'], self._abbr['ND'], self._abbr['NP']
+        result.extend(
+            f'dup {i} {len(enc)} {RD} {enc} {NP}'
+            for i, enc in enumerate(encrypted)
+        )
+        result.extend((ND, ''))
+        return '\n'.join(result)
 
 
 _StandardEncoding = {
