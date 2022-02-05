@@ -549,11 +549,15 @@ class Collection(artist.Artist, cm.ScalarMappable):
         offsets : (N, 2) or (2,) array-like
         """
         offsets = np.asanyarray(offsets)
-        if offsets.shape == (2,):  # Broadcast (2,) -> (1, 2) but nothing else.
+        if offsets.shape == (2,):
             offsets = offsets[None, :]
-        self._offsets = np.column_stack(
-            (np.asarray(self.convert_xunits(offsets[:, 0]), 'float'),
-             np.asarray(self.convert_yunits(offsets[:, 1]), 'float')))
+
+        if offsets.shape == (2, 0):
+            self._offsets = offsets.astype('float').T
+        else:
+            self._offsets = np.column_stack(
+                (np.asarray(self.convert_xunits(offsets[:, 0]), 'float'),
+                 np.asarray(self.convert_yunits(offsets[:, 1]), 'float')))
         self.stale = True
 
     def get_offsets(self):

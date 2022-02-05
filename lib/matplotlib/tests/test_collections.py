@@ -1101,3 +1101,13 @@ def test_set_offset_units():
     off0 = sc.get_offsets()
     sc.set_offsets(list(zip(y, d)))
     np.testing.assert_allclose(off0, sc.get_offsets())
+
+
+def test_set_offset_empty():
+    expected = mcollections.Collection(offsets=np.column_stack([[], []]))
+
+    modified = mcollections.Collection(
+        offsets=np.column_stack([[0, 1], [0, 1]])
+    )
+    modified.set_offsets([[], []])
+    np.testing.assert_allclose(expected.get_offsets(), modified.get_offsets())
