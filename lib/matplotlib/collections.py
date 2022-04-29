@@ -1808,9 +1808,10 @@ class PatchCollection(Collection):
 
         *match_original*
             If True, use the colors and linewidths of the original
-            patches.  If False, new colors may be assigned by
-            providing the standard collection arguments, facecolor,
-            edgecolor, linewidths, norm or cmap.
+            patches. Also use the hatch of the first patch provided.
+            If False, new colors may be assigned by providing the
+            standard collection arguments, facecolor, edgecolor,
+            linewidths, norm or cmap.
 
         If any of *edgecolors*, *facecolors*, *linewidths*, *antialiaseds* are
         None, they default to their `.rcParams` patch setting, in sequence
@@ -1827,12 +1828,22 @@ class PatchCollection(Collection):
                 if patch.get_fill():
                     return patch.get_facecolor()
                 return [0, 0, 0, 0]
-
             kwargs['facecolors'] = [determine_facecolor(p) for p in patches]
-            kwargs['edgecolors'] = [p.get_edgecolor() for p in patches]
+            # If no edgecolor was set within the collection of patches
+            # then we will not supply the edgecolor argument, which allows the
+            # default hatch color to be used.
+            if any(p._original_edgecolor is not None for p in patches):
+                kwargs['edgecolors'] = [p.get_edgecolor() for p in patches]
             kwargs['linewidths'] = [p.get_linewidth() for p in patches]
             kwargs['linestyles'] = [p.get_linestyle() for p in patches]
             kwargs['antialiaseds'] = [p.get_antialiased() for p in patches]
+            if patches:
+                hatch = patches[0].get_hatch()
+                kwargs['hatch'] = hatch
+                if any(p.get_hatch() != hatch for p in patches):
+                    warnings.warn("More than one type of hatch detected in "
+                                  "PatchCollection. Only using hatch of "
+                                  "first patch.")
 
         super().__init__(**kwargs)
 
