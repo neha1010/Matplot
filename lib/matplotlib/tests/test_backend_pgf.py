@@ -11,7 +11,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.testing import _has_tex_package, _check_for_pgf
 from matplotlib.testing.compare import compare_images, ImageComparisonFailure
-from matplotlib.backends.backend_pgf import PdfPages, _tex_escape
+from matplotlib.backends.backend_pgf import (
+    FigureCanvasPgf, PdfPages, _tex_escape)
 from matplotlib.testing.decorators import (
     _image_directories, check_figures_equal, image_comparison)
 from matplotlib.testing._markers import (
@@ -365,3 +366,13 @@ def test_sketch_params():
     # \pgfdecoratecurrentpath must be after the path definition and before the
     # path is used (\pgfusepath)
     assert baseline in buf
+
+
+@needs_pgf_xelatex
+@pytest.mark.backend('pgf')
+@image_comparison(['hatch_linewidth'], extensions=['pdf'])
+def test_pgf_hatch_linewidth():
+    mpl.backend_bases.register_backend('pdf', FigureCanvasPgf)
+    mpl.rcParams['hatch.linewidth'] = 0.1
+
+    plt.bar(1, 1, color='white', edgecolor='black', hatch='/')
