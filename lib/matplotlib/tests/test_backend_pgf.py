@@ -368,7 +368,6 @@ def test_sketch_params():
     assert baseline in buf
 
 
-@needs_pgf_xelatex
 @pytest.mark.backend('pgf')
 @image_comparison(['hatch_linewidth'], extensions=['pdf'])
 def test_pgf_hatch_linewidth():
