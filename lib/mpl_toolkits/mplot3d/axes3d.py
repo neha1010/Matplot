@@ -62,6 +62,13 @@ class Axes3D(Axes):
     sx = _api.deprecate_privatize_attribute("3.7")
     sy = _api.deprecate_privatize_attribute("3.7")
 
+    #: Callable to format the z-data in an interactive window
+    #:
+    #: The expected signature is ::
+    #:
+    #:     def fmt(val: float, /) -> str: ...
+    fmt_zdata = None
+
     def __init__(
             self, fig, rect=None, *args,
             elev=30, azim=-60, roll=0, sharez=None, proj_type='persp',
