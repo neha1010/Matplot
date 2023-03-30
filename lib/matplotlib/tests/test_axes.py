@@ -1894,10 +1894,8 @@ def test_boxplot_capwidths():
 
 
 def test_pcolor_regression(pd):
-    from pandas.plotting import (
-        register_matplotlib_converters,
-        deregister_matplotlib_converters,
-    )
+    from pandas.plotting import (deregister_matplotlib_converters,
+                                 register_matplotlib_converters)
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -2871,7 +2869,7 @@ def test_log_scales_invalid():
         ax.set_ylim(-1, 10)
 
 
-@image_comparison(['stackplot_test_image', 'stackplot_test_image'])
+@image_comparison(['stackploty_test_image', 'stackplot_test_image'])
 def test_stackplot():
     fig = plt.figure()
     x = np.linspace(0, 10, 10)
@@ -2915,6 +2913,26 @@ def test_stackplot_baseline():
     axs[0, 1].stackplot(range(100), d.T, baseline='sym')
     axs[1, 0].stackplot(range(100), d.T, baseline='wiggle')
     axs[1, 1].stackplot(range(100), d.T, baseline='weighted_wiggle')
+
+
+@image_comparison(['stackplot_test_where'])
+def test_stackplot_where():
+
+    fig = plt.figure()
+
+    x = np.arange(10)
+    y0 = np.linspace(0, 1, 10)
+    y1 = np.linspace(0, 1, 10)
+    y2 = [0, 0, 0.25, 0, 0, 0, 0.25, 0, 0, 0]
+    y3 = np.linspace(0, 1, 10)
+
+    colors = ['grey', 'blue', 'red', 'blue']
+
+    y = np.stack([y0, y1, y2, y3])
+
+    ax = fig.add_subplot(1, 1, 1)
+    ax.stackplot(x, y, colors=colors, where=(y != 0),
+                 interpolate=True, edgecolor='face')
 
 
 def _bxp_test_helper(
