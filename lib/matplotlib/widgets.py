@@ -105,9 +105,7 @@ class Widget:
 
         """
         # no canvas, something is very fishy
-        if self.canvas is None:
-            return True
-        return self.canvas is not self.canvas.figure.canvas
+        return self.canvas is not None and self.canvas is not self.canvas.figure.canvas
 
 
 class AxesWidget(Widget):
