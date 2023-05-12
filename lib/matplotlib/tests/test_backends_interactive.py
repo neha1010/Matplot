@@ -623,6 +623,19 @@ def test_blitting_events(env):
     assert 0 < ndraws < 5
 
 
+def test_fallback_to_different_backend():
+    import subprocess
+    # Runs the process that caused the GH issue 23770
+    # making sure that this doesn't crash
+    # since we're supposed to be switching to a different backend instead.
+    response = subprocess.run(["python", "-c",
+                                "import IPython.core.interactiveshell as ipsh; "
+                                "ipsh.InteractiveShell.instance(); "
+                                "import matplotlib.pyplot; "
+                                "matplotlib.pyplot.figure()"], check=True)
+    assert response != subprocess.CalledProcessError
+
+
 # The source of this function gets extracted and run in another process, so it
 # must be fully self-contained.
 def _test_figure_leak():
