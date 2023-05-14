@@ -229,12 +229,10 @@ def install_repl_displayhook() -> None:
 
     from IPython.core.pylabtools import backend2gui  # type: ignore
     # trigger IPython's eventloop integration, if available
-    try:
-        ipython_gui_name = backend2gui.get(get_backend())
-        if ipython_gui_name:
-            ip.enable_gui(ipython_gui_name)
-    except NotImplementedError as err:
-        raise ImportError('Fallback to a different backend.') from err
+
+    ipython_gui_name = backend2gui.get(get_backend())
+    if ipython_gui_name:
+        ip.enable_gui(ipython_gui_name)
 
 
 def uninstall_repl_displayhook() -> None:
@@ -437,9 +435,9 @@ def switch_backend(newbackend: str) -> None:
     # Make sure the repl display hook is installed in case we become interactive.
     try:
         install_repl_displayhook()
-    except ImportError as err:
-        _log.warning(str(err))
-        raise ImportError
+    except NotImplementedError as err:
+        _log.warning("Fallback to a different backend")
+        raise ImportError from err
 
 
 def _warn_if_gui_out_of_main_thread() -> None:
