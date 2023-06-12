@@ -623,16 +623,20 @@ def test_blitting_events(env):
     assert 0 < ndraws < 5
 
 
+def _fallback_check():
+    import IPython.core.interactiveshell as ipsh
+    import matplotlib.pyplot
+    ipsh.InteractiveShell.instance()
+    matplotlib.pyplot.figure()
+
+
 def test_fallback_to_different_backend():
+    pytest.importorskip("IPython")
     import subprocess
     # Runs the process that caused the GH issue 23770
     # making sure that this doesn't crash
     # since we're supposed to be switching to a different backend instead.
-    response = subprocess.run(["python", "-c",
-                                "import IPython.core.interactiveshell as ipsh; "
-                                "ipsh.InteractiveShell.instance(); "
-                                "import matplotlib.pyplot; "
-                                "matplotlib.pyplot.figure()"], check=True)
+    response = _run_helper(_fallback_check, timeout=_test_timeout)
     assert response != subprocess.CalledProcessError
 
 
