@@ -116,6 +116,7 @@ extensions = [
     'sphinxext.redirect_from',
     'sphinx_copybutton',
     'sphinx_design',
+    'jupyterlite_sphinx',
 ]
 
 exclude_patterns = [
@@ -677,6 +678,12 @@ texinfo_documents = [
      'Matplotlib', "Python plotting package", 'Programming',
      1),
 ]
+
+# jupyterlite config
+jupyterlite_config = "jupyter_lite_config.json"
+jupyterlite_dir = "."
+jupyterlite_contents = ["gallery/**"]
+jupyterlite_bind_ipynb_suffix = False
 
 # numpydoc config
 

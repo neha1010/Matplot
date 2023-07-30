@@ -36,7 +36,6 @@ Installation
 
 Further details are available in the :doc:`Installation Guide <users/installing/index>`.
 
-
 ******************
 Learning resources
 ******************
@@ -86,6 +85,16 @@ Learning resources
           - Figures (`.pyplot.figure`)
           - Subplots (`.pyplot.subplots`, `.pyplot.subplot_mosaic`)
 
+
+************
+Live example
+************
+
+Try Matplotlib directly in this documentation (Press ``shift+Enter`` to execute code)! Alternatively, you can try the gallery examples in `our JupyterLite deployment <./lite/lab>`__.
+
+.. retrolite:: matplotlib.ipynb
+   :height: 600px
+   :prompt: Try Matplotlib!
 
 ********************
 Third-party packages
