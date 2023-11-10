@@ -3800,17 +3800,17 @@ def test_violinplot_outofrange_quantiles():
 
 @check_figures_equal(extensions=["png"])
 def test_violinplot_color_specification(fig_test, fig_ref):
-    # Ensures that setting colors in violinplot constructor works 
+    # Ensures that setting colors in violinplot constructor works
     # the same way as setting the color of each object manually
     np.random.seed(19680801)
     data = [sorted(np.random.normal(0, std, 100)) for std in range(1, 5)]
-    kwargs = {'showmeans':True,
-              'showextrema':True,
-              'showmedians':True,
+    kwargs = {'showmeans': True,
+              'showextrema': True,
+              'showmedians': True, 
               }
 
     # Test image
-    ax = fig_test.subplots(1,3)
+    ax = fig_test.subplots(1, 3)
     parts0 = ax[0].violinplot(data, **kwargs)
     for pc in parts0['bodies']:
         pc.set_facecolor('r')
@@ -3830,7 +3830,7 @@ def test_violinplot_color_specification(fig_test, fig_ref):
             pc.set_edgecolor('r')
 
     # Reference image
-    ax = fig_test.subplots(1,3)
+    ax = fig_test.subplots(1, 3)
     ax[0].violinplot(data, color='r', **kwargs)
     ax[1].violinplot(data, fillcolor='r', **kwargs)
     ax[2].violinplot(data, linecolor='r', **kwargs)
