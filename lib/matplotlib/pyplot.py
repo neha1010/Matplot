@@ -4037,6 +4037,9 @@ def violinplot(
     | Callable[[GaussianKDE], float]
     | None = None,
     *,
+    fillcolor: ColorType | None = None,
+    linecolor: ColorType | None = None,
+    color: ColorType | None = None,
     data=None,
 ) -> dict[str, Collection]:
     return gca().violinplot(
@@ -4050,6 +4053,9 @@ def violinplot(
         quantiles=quantiles,
         points=points,
         bw_method=bw_method,
+        fillcolor=fillcolor,
+        linecolor=linecolor,
+        color=color,
         **({"data": data} if data is not None else {}),
     )
 

@@ -8173,7 +8173,8 @@ such objects
     @_preprocess_data(replace_names=["dataset"])
     def violinplot(self, dataset, positions=None, vert=True, widths=0.5,
                    showmeans=False, showextrema=True, showmedians=False,
-                   quantiles=None, points=100, bw_method=None):
+                   quantiles=None, points=100, bw_method=None,
+                   fillcolor=None, linecolor=None, color=None):
         """
         Make a violin plot.
 
@@ -8226,6 +8227,17 @@ such objects
           its only parameter and return a scalar. If None (default), 'scott'
           is used.
 
+        fillcolor : color or None; see :ref:`colors_def`
+          If provided, will set the fill color of the violin plots. The alpha
+          value of the fill is automatically set to 0.3.
+
+        linecolor : color or None; see :ref:`colors_def`
+          If provided, will set the line color of the violin plots (the 
+          horizontal and vertical spines).
+        
+        color : color or None; see :ref:`colors_def`
+          If provided, will set (and overwrite) the fillcolor and linecolor.
+
         data : indexable object, optional
             DATA_PARAMETER_PLACEHOLDER
 
@@ -8273,10 +8285,13 @@ such objects
                                      quantiles=quantiles)
         return self.violin(vpstats, positions=positions, vert=vert,
                            widths=widths, showmeans=showmeans,
-                           showextrema=showextrema, showmedians=showmedians)
+                           showextrema=showextrema, showmedians=showmedians,
+                           fillcolor=fillcolor, linecolor=linecolor, 
+                           color=color)
 
     def violin(self, vpstats, positions=None, vert=True, widths=0.5,
-               showmeans=False, showextrema=True, showmedians=False):
+               showmeans=False, showextrema=True, showmedians=False,
+               fillcolor=None, linecolor=None, color=None):
         """
         Drawing function for violin plots.
 
@@ -8331,6 +8346,17 @@ such objects
 
         showmedians : bool, default: False
           If true, will toggle rendering of the medians.
+
+        fillcolor : color or None; see :ref:`colors_def`
+          If provided, will set the fill color of the violin plots. The alpha
+          value of the fill is automatically set to 0.3.
+
+        linecolor : color or None; see :ref:`colors_def`
+          If provided, will set the line color of the violin plots (the 
+          horizontal and vertical spines).
+        
+        color : color or None; see :ref:`colors_def`
+          If provided, will set (and overwrite) the fillcolor and linecolor.
 
         Returns
         -------
@@ -8392,12 +8418,22 @@ such objects
         # Calculate ranges for statistics lines (shape (2, N)).
         line_ends = [[-0.25], [0.25]] * np.array(widths) + positions
 
-        # Colors.
+        # Set default colors for when user doesn't provide them
         if mpl.rcParams['_internal.classic_mode']:
-            fillcolor = 'y'
-            linecolor = 'r'
+            default_fillcolor = 'y'
+            default_linecolor = 'r'
         else:
-            fillcolor = linecolor = self._get_lines.get_next_color()
+            default_fillcolor = default_linecolor = self._get_lines.get_next_color()
+
+        # Overwrite fillcolor and linecolor if color is provided
+        if color is not None:
+            fillcolor = linecolor = color
+        
+        # Set color of violin plots
+        if fillcolor is None: 
+            fillcolor = default_fillcolor
+        if linecolor is None:
+            linecolor = default_linecolor
 
         # Check whether we are rendering vertically or horizontally
         if vert:
