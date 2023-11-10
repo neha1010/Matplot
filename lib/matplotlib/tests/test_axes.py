@@ -3804,10 +3804,14 @@ def test_violinplot_color_specification(fig_test, fig_ref):
     # the same way as setting the color of each object manually
     np.random.seed(19680801)
     data = [sorted(np.random.normal(0, std, 100)) for std in range(1, 5)]
-    
+    kwargs = {'showmeans':True,
+              'showextrema':True,
+              'showmedians':True,
+              }
+
     # Test image
     ax = fig_test.subplots(1,3)
-    parts0 = ax[0].violinplot(data, showmeans = True, showextrema = True, showmedians = True)
+    parts0 = ax[0].violinplot(data, **kwargs)
     for pc in parts0['bodies']:
         pc.set_facecolor('r')
     for partname in ('cbars', 'cmins', 'cmaxes', 'cmeans', 'cmedians'):
@@ -3815,11 +3819,11 @@ def test_violinplot_color_specification(fig_test, fig_ref):
             pc = parts0[partname]
             pc.set_edgecolor('r')
 
-    parts1 = ax[1].violinplot(data, showmeans = True, showextrema = True, showmedians = True)
+    parts1 = ax[1].violinplot(data, **kwargs)
     for pc in parts1['bodies']:
         pc.set_facecolor('r')
 
-    parts2 = ax[2].violinplot(data, showmeans = True, showextrema = True, showmedians = True)
+    parts2 = ax[2].violinplot(data, **kwargs)
     for partname in ('cbars', 'cmins', 'cmaxes', 'cmeans', 'cmedians'):
         if partname in parts2:
             pc = parts2[partname]
@@ -3827,9 +3831,9 @@ def test_violinplot_color_specification(fig_test, fig_ref):
 
     # Reference image
     ax = fig_test.subplots(1,3)
-    ax[0].violinplot(data, color = 'r', showmeans = True, showextrema = True, showmedians = True)
-    ax[1].violinplot(data, fillcolor = 'r', showmeans = True, showextrema = True, showmedians = True)
-    ax[2].violinplot(data, linecolor = 'r', showmeans = True, showextrema = True, showmedians = True)
+    ax[0].violinplot(data, color='r', **kwargs)
+    ax[1].violinplot(data, fillcolor='r', **kwargs)
+    ax[2].violinplot(data, linecolor='r', **kwargs)
 
 
 @check_figures_equal(extensions=["png"])
