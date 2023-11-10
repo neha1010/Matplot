@@ -8229,14 +8229,20 @@ such objects
 
         fillcolor : color or None; see :ref:`colors_def`
           If provided, will set the fill color of the violin plots. The alpha
-          value of the fill is automatically set to 0.3.
+          value of the fillcolor is automatically set to 0.3.
+
+          .. versionadded:: 3.9
 
         linecolor : color or None; see :ref:`colors_def`
           If provided, will set the line color of the violin plots (the
           horizontal and vertical spines).
 
+          .. versionadded:: 3.9
+
         color : color or None; see :ref:`colors_def`
           If provided, will set (and overwrite) the fillcolor and linecolor.
+
+          .. versionadded:: 3.9
 
         data : indexable object, optional
             DATA_PARAMETER_PLACEHOLDER
