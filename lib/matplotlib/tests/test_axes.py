@@ -3806,7 +3806,7 @@ def test_violinplot_color_specification(fig_test, fig_ref):
     data = [sorted(np.random.normal(0, std, 100)) for std in range(1, 5)]
     kwargs = {'showmeans': True,
               'showextrema': True,
-              'showmedians': True, 
+              'showmedians': True
               }
 
     # Test image
