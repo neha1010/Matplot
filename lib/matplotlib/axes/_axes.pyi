@@ -743,10 +743,10 @@ class Axes(_AxesBase):
         | float
         | Callable[[GaussianKDE], float]
         | None = ...,
-        *,
         fillcolor: ColorType | None = None,
         linecolor: ColorType | None = None,
         color: ColorType | None = None,
+        *,
         data=...,
     ) -> dict[str, Collection]: ...
     def violin(
