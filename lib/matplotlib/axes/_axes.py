@@ -8232,9 +8232,9 @@ such objects
           value of the fill is automatically set to 0.3.
 
         linecolor : color or None; see :ref:`colors_def`
-          If provided, will set the line color of the violin plots (the 
+          If provided, will set the line color of the violin plots (the
           horizontal and vertical spines).
-        
+
         color : color or None; see :ref:`colors_def`
           If provided, will set (and overwrite) the fillcolor and linecolor.
 
@@ -8286,7 +8286,7 @@ such objects
         return self.violin(vpstats, positions=positions, vert=vert,
                            widths=widths, showmeans=showmeans,
                            showextrema=showextrema, showmedians=showmedians,
-                           fillcolor=fillcolor, linecolor=linecolor, 
+                           fillcolor=fillcolor, linecolor=linecolor,
                            color=color)
 
     def violin(self, vpstats, positions=None, vert=True, widths=0.5,
@@ -8352,9 +8352,9 @@ such objects
           value of the fill is automatically set to 0.3.
 
         linecolor : color or None; see :ref:`colors_def`
-          If provided, will set the line color of the violin plots (the 
+          If provided, will set the line color of the violin plots (the
           horizontal and vertical spines).
-        
+
         color : color or None; see :ref:`colors_def`
           If provided, will set (and overwrite) the fillcolor and linecolor.
 
@@ -8428,9 +8428,9 @@ such objects
         # Overwrite fillcolor and linecolor if color is provided
         if color is not None:
             fillcolor = linecolor = color
-        
+
         # Set color of violin plots
-        if fillcolor is None: 
+        if fillcolor is None:
             fillcolor = default_fillcolor
         if linecolor is None:
             linecolor = default_linecolor
