@@ -4036,10 +4036,10 @@ def violinplot(
     | float
     | Callable[[GaussianKDE], float]
     | None = None,
-    *,
     fillcolor: ColorType | None = None,
     linecolor: ColorType | None = None,
     color: ColorType | None = None,
+    *,
     data=None,
 ) -> dict[str, Collection]:
     return gca().violinplot(
