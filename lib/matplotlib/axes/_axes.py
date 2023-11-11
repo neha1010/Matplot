@@ -8292,7 +8292,7 @@ such objects
         return self.violin(vpstats, positions=positions, vert=vert,
                            widths=widths, showmeans=showmeans,
                            showextrema=showextrema, showmedians=showmedians,
-                           faceolor=facecolor, edgecolor=edgecolor,
+                           facecolor=facecolor, edgecolor=edgecolor,
                            color=color)
 
     def violin(self, vpstats, positions=None, vert=True, widths=0.5,
