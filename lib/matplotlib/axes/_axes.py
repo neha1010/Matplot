@@ -8174,7 +8174,7 @@ such objects
     def violinplot(self, dataset, positions=None, vert=True, widths=0.5,
                    showmeans=False, showextrema=True, showmedians=False,
                    quantiles=None, points=100, bw_method=None,
-                   fillcolor=None, linecolor=None, color=None):
+                   facecolor=None, edgecolor=None, color=None):
         """
         Make a violin plot.
 
@@ -8227,20 +8227,20 @@ such objects
           its only parameter and return a scalar. If None (default), 'scott'
           is used.
 
-        fillcolor : color or None; see :ref:`colors_def`
-          If provided, will set the fill color of the violin plots. The alpha
-          value of the fillcolor is automatically set to 0.3.
+        facecolor : color or None; see :ref:`colors_def`
+          If provided, will set the face color of the violin plots. The alpha
+          value is automatically set to 0.3.
 
           .. versionadded:: 3.9
 
-        linecolor : color or None; see :ref:`colors_def`
-          If provided, will set the line color of the violin plots (the
+        edgecolor : color or None; see :ref:`colors_def`
+          If provided, will set the edge color of the violin plots (the
           horizontal and vertical spines).
 
           .. versionadded:: 3.9
 
         color : color or None; see :ref:`colors_def`
-          If provided, will set (and overwrite) the fillcolor and linecolor.
+          If provided, will set (and overwrite) the facecolor and edgecolor.
 
           .. versionadded:: 3.9
 
@@ -8292,12 +8292,12 @@ such objects
         return self.violin(vpstats, positions=positions, vert=vert,
                            widths=widths, showmeans=showmeans,
                            showextrema=showextrema, showmedians=showmedians,
-                           fillcolor=fillcolor, linecolor=linecolor,
+                           faceolor=facecolor, edgecolor=edgecolor,
                            color=color)
 
     def violin(self, vpstats, positions=None, vert=True, widths=0.5,
                showmeans=False, showextrema=True, showmedians=False,
-               fillcolor=None, linecolor=None, color=None):
+               facecolor=None, edgecolor=None, color=None):
         """
         Drawing function for violin plots.
 
@@ -8353,16 +8353,22 @@ such objects
         showmedians : bool, default: False
           If true, will toggle rendering of the medians.
 
-        fillcolor : color or None; see :ref:`colors_def`
-          If provided, will set the fill color of the violin plots. The alpha
-          value of the fill is automatically set to 0.3.
+        facecolor : color or None; see :ref:`colors_def`
+          If provided, will set the face color of the violin plots. The alpha
+          value is automatically set to 0.3.
 
-        linecolor : color or None; see :ref:`colors_def`
-          If provided, will set the line color of the violin plots (the
+          .. versionadded:: 3.9
+
+        edgecolor : color or None; see :ref:`colors_def`
+          If provided, will set the edge color of the violin plots (the
           horizontal and vertical spines).
 
+          .. versionadded:: 3.9
+
         color : color or None; see :ref:`colors_def`
-          If provided, will set (and overwrite) the fillcolor and linecolor.
+          If provided, will set (and overwrite) the facecolor and edgecolor.
+
+          .. versionadded:: 3.9
 
         Returns
         -------
@@ -8426,30 +8432,30 @@ such objects
 
         # Set default colors for when user doesn't provide them
         if mpl.rcParams['_internal.classic_mode']:
-            default_fillcolor = 'y'
-            default_linecolor = 'r'
+            default_facecolor = 'y'
+            default_edgecolor = 'r'
         else:
-            default_fillcolor = default_linecolor = self._get_lines.get_next_color()
+            default_facecolor = default_edgecolor = self._get_lines.get_next_color()
 
-        # Overwrite fillcolor and linecolor if color is provided
+        # Overwrite facecolor and edgecolor if color is provided
         if color is not None:
-            fillcolor = linecolor = color
+            facecolor = edgecolor = color
 
         # Set color of violin plots
-        if fillcolor is None:
-            fillcolor = default_fillcolor
-        if linecolor is None:
-            linecolor = default_linecolor
+        if facecolor is None:
+            facecolor = default_facecolor
+        if edgecolor is None:
+            edgecolor = default_edgecolor
 
         # Check whether we are rendering vertically or horizontally
         if vert:
             fill = self.fill_betweenx
-            perp_lines = functools.partial(self.hlines, colors=linecolor)
-            par_lines = functools.partial(self.vlines, colors=linecolor)
+            perp_lines = functools.partial(self.hlines, colors=edgecolor)
+            par_lines = functools.partial(self.vlines, colors=edgecolor)
         else:
             fill = self.fill_between
-            perp_lines = functools.partial(self.vlines, colors=linecolor)
-            par_lines = functools.partial(self.hlines, colors=linecolor)
+            perp_lines = functools.partial(self.vlines, colors=edgecolor)
+            par_lines = functools.partial(self.hlines, colors=edgecolor)
 
         # Render violins
         bodies = []
@@ -8458,7 +8464,7 @@ such objects
             vals = np.array(stats['vals'])
             vals = 0.5 * width * vals / vals.max()
             bodies += [fill(stats['coords'], -vals + pos, vals + pos,
-                            facecolor=fillcolor, alpha=0.3)]
+                            facecolor=facecolor, alpha=0.3)]
             means.append(stats['mean'])
             mins.append(stats['min'])
             maxes.append(stats['max'])

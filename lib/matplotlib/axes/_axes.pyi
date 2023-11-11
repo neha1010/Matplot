@@ -743,8 +743,8 @@ class Axes(_AxesBase):
         | float
         | Callable[[GaussianKDE], float]
         | None = ...,
-        fillcolor: ColorType | None = None,
-        linecolor: ColorType | None = None,
+        facecolor: ColorType | None = None,
+        edgecolor: ColorType | None = None,
         color: ColorType | None = None,
         *,
         data=...,
@@ -758,8 +758,8 @@ class Axes(_AxesBase):
         showmeans: bool = ...,
         showextrema: bool = ...,
         showmedians: bool = ...,
-        fillcolor: ColorType | None = None,
-        linecolor: ColorType | None = None,
+        facecolor: ColorType | None = None,
+        edgecolor: ColorType | None = None,
         color: ColorType | None = None,
     ) -> dict[str, Collection]: ...
 

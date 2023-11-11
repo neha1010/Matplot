@@ -45,7 +45,7 @@ ax1.violinplot(data)
 ax2.set_title('Customized violin plot')
 parts = ax2.violinplot(
         data, showmeans=False, showmedians=False, showextrema=False,
-        fillcolor='#D43F3A', linecolor='k')
+        facecolor='#D43F3A', edgecolor='k')
 
 for pc in parts['bodies']:
     pc.set_edgecolor('black')
