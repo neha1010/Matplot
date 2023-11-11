@@ -3830,7 +3830,7 @@ def test_violinplot_color_specification(fig_test, fig_ref):
             pc.set_edgecolor('r')
 
     # Reference image
-    ax = fig_test.subplots(1, 3)
+    ax = fig_ref.subplots(1, 3)
     ax[0].violinplot(data, color='r', **kwargs)
     ax[1].violinplot(data, fillcolor='r', **kwargs)
     ax[2].violinplot(data, linecolor='r', **kwargs)
