@@ -3810,7 +3810,7 @@ def test_violinplot_color_specification(fig_test, fig_ref):
               }
 
     # Test image
-    ax = fig_test.subplots(1, 3)
+    ax = fig_test.subplots(1, 5)
     parts0 = ax[0].violinplot(data, **kwargs)
     for pc in parts0['bodies']:
         pc.set_facecolor('r')
@@ -3829,11 +3829,24 @@ def test_violinplot_color_specification(fig_test, fig_ref):
             pc = parts2[partname]
             pc.set_edgecolor('r')
 
+    parts3 = ax[3].violinplot(data, **kwargs)
+    for pc in parts3['bodies']:
+        pc.set_facecolor('g')
+    for partname in ('cbars', 'cmins', 'cmaxes', 'cmeans', 'cmedians'):
+        if partname in parts3:
+            pc = parts3[partname]
+            pc.set_edgecolor('r')
+
+    # Last check that 'color' overwrites face and edgecolor
+    ax[4].violinplot(data, color='k', facecolor='g', edgecolor='g', **kwargs)
+
     # Reference image
-    ax = fig_ref.subplots(1, 3)
+    ax = fig_ref.subplots(1, 5)
     ax[0].violinplot(data, color='r', **kwargs)
     ax[1].violinplot(data, facecolor='r', **kwargs)
     ax[2].violinplot(data, edgecolor='r', **kwargs)
+    ax[3].violinplot(data, facecolor='g', edgecolor='r', **kwargs)
+    ax[4].violinplot(data, color='k', **kwargs)
 
 
 @check_figures_equal(extensions=["png"])
