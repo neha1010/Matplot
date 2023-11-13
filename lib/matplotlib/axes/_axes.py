@@ -8231,18 +8231,16 @@ such objects
           If provided, will set the face color of the violin plots. The alpha
           value is automatically set to 0.3.
 
-          .. versionadded:: 3.9
-
         edgecolor : color or None; see :ref:`colors_def`
           If provided, will set the edge color of the violin plots (the
           horizontal and vertical spines).
-
-          .. versionadded:: 3.9
 
         color : color or None; see :ref:`colors_def`
           If provided, will set (and overwrite) the facecolor and edgecolor.
 
           .. versionadded:: 3.9
+
+            color, edgecolor, facecolor
 
         data : indexable object, optional
             DATA_PARAMETER_PLACEHOLDER
@@ -8357,18 +8355,16 @@ such objects
           If provided, will set the face color of the violin plots. The alpha
           value is automatically set to 0.3.
 
-          .. versionadded:: 3.9
-
         edgecolor : color or None; see :ref:`colors_def`
           If provided, will set the edge color of the violin plots (the
           horizontal and vertical spines).
-
-          .. versionadded:: 3.9
 
         color : color or None; see :ref:`colors_def`
           If provided, will set (and overwrite) the facecolor and edgecolor.
 
           .. versionadded:: 3.9
+
+            color, edgecolor, facecolor
 
         Returns
         -------
