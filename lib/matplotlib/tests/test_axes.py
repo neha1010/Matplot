@@ -3850,6 +3850,31 @@ def test_violinplot_color_specification(fig_test, fig_ref):
 
 
 @check_figures_equal(extensions=["png"])
+def test_violinplot_color_sequence(fig_test, fig_ref):
+    # Ensures that setting a sequence of colors works the same as setting
+    # each color independently
+    N = 5
+    np.random.seed(19680801)
+    data = [sorted(np.random.normal(0, std, 100)) for std in range(1, N)]
+    kwargs = {'showmeans': True,
+              'showextrema': True,
+              'showmedians': True
+              }
+
+    # Color sequence
+    colors = ['k', 'r', 'b', 'g', 'm']
+
+    # Test image
+    ax = fig_test.gca()
+    ax.violinplot(data, color=colors, **kwargs)
+
+    # Reference image
+    ax = fig_ref.gca()
+    for n, (c, d) in enumerate(zip(colors, data)):
+        ax.violinplot(d, positions=[n], color=c, **kwargs)
+
+
+@check_figures_equal(extensions=["png"])
 def test_violinplot_single_list_quantiles(fig_test, fig_ref):
     # Ensures quantile list for 1D can be passed in as single list
     # First 9 digits of frac(sqrt(83))

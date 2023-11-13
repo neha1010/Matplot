@@ -4036,9 +4036,9 @@ def violinplot(
     | float
     | Callable[[GaussianKDE], float]
     | None = None,
-    facecolor: ColorType | None = None,
-    edgecolor: ColorType | None = None,
-    color: ColorType | None = None,
+    facecolor: Sequence[ColorType] | ColorType | None = None,
+    edgecolor: Sequence[ColorType] | ColorType | None = None,
+    color: Sequence[ColorType] | ColorType | None = None,
     *,
     data=None,
 ) -> dict[str, Collection]:

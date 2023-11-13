@@ -743,9 +743,9 @@ class Axes(_AxesBase):
         | float
         | Callable[[GaussianKDE], float]
         | None = ...,
-        facecolor: ColorType | None = None,
-        edgecolor: ColorType | None = None,
-        color: ColorType | None = None,
+        facecolor: Sequence[ColorType] | ColorType | None = None,
+        edgecolor: Sequence[ColorType] | ColorType | None = None,
+        color: Sequence[ColorType] | ColorType | None = None,
         *,
         data=...,
     ) -> dict[str, Collection]: ...
@@ -758,9 +758,9 @@ class Axes(_AxesBase):
         showmeans: bool = ...,
         showextrema: bool = ...,
         showmedians: bool = ...,
-        facecolor: ColorType | None = None,
-        edgecolor: ColorType | None = None,
-        color: ColorType | None = None,
+        facecolor: Sequence[ColorType] | ColorType | None = None,
+        edgecolor: Sequence[ColorType] | ColorType | None = None,
+        color: Sequence[ColorType] | ColorType | None = None,
     ) -> dict[str, Collection]: ...
 
     table = mtable.table
