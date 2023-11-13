@@ -3878,7 +3878,7 @@ def test_violinplot_color_sequence(fig_test, fig_ref):
     # Reference image
     ax = fig_ref.gca()
     for n, (c, d) in enumerate(zip(colors, data)):
-        ax.violinplot(d, positions=[n], color=c, **kwargs)
+        ax.violinplot(d, positions=[n+1], color=c, **kwargs)
     # Ensure all x/y axis features are identical (not what this is designed to test)
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
