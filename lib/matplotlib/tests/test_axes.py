@@ -3853,20 +3853,21 @@ def test_violinplot_color_specification(fig_test, fig_ref):
 def test_violinplot_color_sequence(fig_test, fig_ref):
     # Ensures that setting a sequence of colors works the same as setting
     # each color independently
-    N = 5
     np.random.seed(19680801)
-    data = [sorted(np.random.normal(0, std, 100)) for std in range(1, N)]
+    data = [sorted(np.random.normal(0, std, 100)) for std in range(1, 5)]
     kwargs = {'showmeans': True,
               'showextrema': True,
               'showmedians': True
               }
 
     # Color sequence
+    N = len(data)
+    positions = range(N)
     colors = ['k', 'r', 'b', 'g', 'm']
 
     # Test image
     ax = fig_test.gca()
-    ax.violinplot(data, color=colors, **kwargs)
+    ax.violinplot(data, positions=positions, color=colors, **kwargs)
     # Get all x/y axis features
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
@@ -3874,11 +3875,18 @@ def test_violinplot_color_sequence(fig_test, fig_ref):
     yticks = ax.get_yticks()
     xticklabels = ax.get_xticklabels()
     yticklabels = ax.get_yticklabels()
+    # Ensure all x/y axis features are identical (not what this is designed to test)
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.set_xticks(xticks)
+    ax.set_yticks(yticks)
+    ax.set_xticklabels(xticklabels)
+    ax.set_yticklabels(yticklabels)
 
     # Reference image
     ax = fig_ref.gca()
-    for n, (c, d) in enumerate(zip(colors, data)):
-        ax.violinplot(d, positions=[n+1], color=c, **kwargs)
+    for (p, c, d) in zip(positions, colors, data):
+        ax.violinplot(d, positions=[p], color=c, **kwargs)
     # Ensure all x/y axis features are identical (not what this is designed to test)
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
