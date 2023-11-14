@@ -55,6 +55,8 @@ parts = ax3.violinplot(
         facecolor='#D43F3A', edgecolor='k')
 
 for pc in parts['bodies']:
+    pc.set_edgecolor('k')
+    pc.set_linewidth(1)
     pc.set_alpha(1)
 
 quartile1, medians, quartile3 = np.percentile(data, [25, 50, 75], axis=1)
