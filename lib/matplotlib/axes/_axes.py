@@ -8455,8 +8455,10 @@ such objects
             if mcolors.is_color_like(facecolor):
                 has_alpha = [mcolors._has_alpha_channel(facecolor) for _ in range(N)]
             else:
-                has_alpha = [mcolors._has_alpha_channel(facecol)
-                             for facecol in itertools.cycle(facecolor)]
+                has_alpha = []
+                alpha_cycle = itertools.cycle(facecolor)
+                for n in range(N):
+                    has_alpha.append(mcolors._has_alpha_channel(next(alpha_cycle)))
             facecolor = cycle_color(facecolor)
 
         if edgecolor is not None:
