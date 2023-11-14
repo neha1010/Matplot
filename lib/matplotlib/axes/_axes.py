@@ -8438,6 +8438,7 @@ such objects
 
         # Set default colors for when user doesn't provide them
         if mpl.rcParams['_internal.classic_mode']:
+            has_alpha = [False for _ in range(N)]
             default_facecolor = cycle_color('y')
             default_edgecolor = cycle_color('r')
         else:
