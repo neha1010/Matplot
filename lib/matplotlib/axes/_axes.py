@@ -8228,8 +8228,7 @@ such objects
           is used.
 
         facecolor : color or list of colors or None; see :ref:`colors_def`
-          If provided, will set the face color(s) of the violin plots. The alpha
-          value is automatically set to 0.3 if not specified by facecolor.
+          If provided, will set the face color(s) of the violin plots.
 
         edgecolor : color or list of colors or None; see :ref:`colors_def`
           If provided, will set the edge color(s) of the violin plots (the
@@ -8352,8 +8351,7 @@ such objects
           If true, will toggle rendering of the medians.
 
         facecolor : color or list of colors or None; see :ref:`colors_def`
-          If provided, will set the face color(s) of the violin plots. The alpha
-          value is automatically set to 0.3 if not specified by facecolor.
+          If provided, will set the face color(s) of the violin plots.
 
         edgecolor : color or list of colors or None; see :ref:`colors_def`
           If provided, will set the edge color(s) of the violin plots (the
@@ -8438,12 +8436,10 @@ such objects
 
         # Set default colors for when user doesn't provide them
         if mpl.rcParams['_internal.classic_mode']:
-            has_alpha = [False for _ in range(N)]
             default_facecolor = cycle_color('y')
             default_edgecolor = cycle_color('r')
         else:
             next_color = self._get_lines.get_next_color()
-            has_alpha = [mcolors._has_alpha_channel(next_color) for _ in range(N)]
             default_facecolor = cycle_color(next_color)
             default_edgecolor = cycle_color(next_color)
 
@@ -8453,13 +8449,6 @@ such objects
 
         # Convert colors to chain (number of colors can be different from len(vpstats))
         if facecolor is not None:
-            if mcolors.is_color_like(facecolor):
-                has_alpha = [mcolors._has_alpha_channel(facecolor) for _ in range(N)]
-            else:
-                has_alpha = []
-                alpha_cycle = itertools.cycle(facecolor)
-                for n in range(N):
-                    has_alpha.append(mcolors._has_alpha_channel(next(alpha_cycle)))
             facecolor = cycle_color(facecolor)
 
         if edgecolor is not None:
@@ -8483,14 +8472,13 @@ such objects
 
         # Render violins
         bodies = []
-        bodies_zip = zip(vpstats, positions, widths, facecolor, has_alpha)
-        for stats, pos, width, facecol, hasalpha in bodies_zip:
+        bodies_zip = zip(vpstats, positions, widths, facecolor)
+        for stats, pos, width, facecol in bodies_zip:
             # The 0.5 factor reflects the fact that we plot from v-p to v+p.
             vals = np.array(stats['vals'])
             vals = 0.5 * width * vals / vals.max()
-            alpha = None if hasalpha else 0.3  # let user set alpha, or default to 0.3
             bodies += [fill(stats['coords'], -vals + pos, vals + pos,
-                            facecolor=facecol, alpha=alpha)]
+                            facecolor=facecol)]
             means.append(stats['mean'])
             mins.append(stats['min'])
             maxes.append(stats['max'])
