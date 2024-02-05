@@ -228,6 +228,7 @@ def install_repl_displayhook() -> None:
 
     from IPython.core.pylabtools import backend2gui  # type: ignore
     # trigger IPython's eventloop integration, if available
+
     ipython_gui_name = backend2gui.get(get_backend())
     if ipython_gui_name:
         ip.enable_gui(ipython_gui_name)
@@ -418,7 +419,6 @@ def switch_backend(newbackend: str) -> None:
     for func_name in ["new_figure_manager", "draw_if_interactive", "show"]:
         globals()[func_name].__signature__ = inspect.signature(
             getattr(backend_mod, func_name))
-
     # Need to keep a global reference to the backend for compatibility reasons.
     # See https://github.com/matplotlib/matplotlib/issues/6092
     matplotlib.backends.backend = newbackend  # type: ignore[attr-defined]
@@ -432,7 +432,11 @@ def switch_backend(newbackend: str) -> None:
         close("all")
 
     # Make sure the repl display hook is installed in case we become interactive.
-    install_repl_displayhook()
+    try:
+        install_repl_displayhook()
+    except NotImplementedError as err:
+        _log.warning("Fallback to a different backend")
+        raise ImportError from err
 
 
 def _warn_if_gui_out_of_main_thread() -> None:
