@@ -8205,7 +8205,8 @@ such objects
     @_preprocess_data(replace_names=["dataset"])
     def violinplot(self, dataset, positions=None, vert=True, widths=0.5,
                    showmeans=False, showextrema=True, showmedians=False,
-                   quantiles=None, points=100, bw_method=None):
+                   quantiles=None, points=100, bw_method=None,
+                   facecolor=None, edgecolor=None, color=None):
         """
         Make a violin plot.
 
@@ -8255,6 +8256,20 @@ such objects
           float, this will be used directly as `kde.factor`.  If a
           callable, it should take a `matplotlib.mlab.GaussianKDE` instance as
           its only parameter and return a float.
+
+        facecolor : color or list of colors or None; see :ref:`colors_def`
+          If provided, will set the face color(s) of the violin plots.
+
+        edgecolor : color or list of colors or None; see :ref:`colors_def`
+          If provided, will set the edge color(s) of the violin plots (the
+          horizontal and vertical spines).
+
+        color : color or list of colors or None; see :ref:`colors_def`
+          If provided, will set (and overwrite) the facecolor(s) and edgecolor(s).
+
+          .. versionadded:: 3.9
+
+            color, edgecolor, facecolor
 
         data : indexable object, optional
             DATA_PARAMETER_PLACEHOLDER
@@ -8307,10 +8322,13 @@ such objects
                                      quantiles=quantiles)
         return self.violin(vpstats, positions=positions, vert=vert,
                            widths=widths, showmeans=showmeans,
-                           showextrema=showextrema, showmedians=showmedians)
+                           showextrema=showextrema, showmedians=showmedians,
+                           facecolor=facecolor, edgecolor=edgecolor,
+                           color=color)
 
     def violin(self, vpstats, positions=None, vert=True, widths=0.5,
-               showmeans=False, showextrema=True, showmedians=False):
+               showmeans=False, showextrema=True, showmedians=False,
+               facecolor=None, edgecolor=None, color=None):
         """
         Draw a violin plot from pre-computed statistics.
 
@@ -8365,6 +8383,20 @@ such objects
 
         showmedians : bool, default: False
           Whether to show the median with a line.
+
+        facecolor : color or list of colors or None; see :ref:`colors_def`
+          If provided, will set the face color(s) of the violin plots.
+
+        edgecolor : color or list of colors or None; see :ref:`colors_def`
+          If provided, will set the edge color(s) of the violin plots (the
+          horizontal and vertical spines).
+
+        color : color or list of colors or None; see :ref:`colors_def`
+          If provided, will set (and overwrite) the facecolor(s) and edgecolor(s).
+
+          .. versionadded:: 3.9
+
+            color, edgecolor, facecolor
 
         Returns
         -------
@@ -8431,31 +8463,61 @@ such objects
         # Calculate ranges for statistics lines (shape (2, N)).
         line_ends = [[-0.25], [0.25]] * np.array(widths) + positions
 
-        # Colors.
+        # Make a cycle of color to iterate through, using 'none' as fallback
+        def cycle_color(color):
+            rgba = mcolors.to_rgba_array(color)
+            color_cycler = itertools.chain(itertools.cycle(rgba),
+                                           itertools.repeat('none'))
+            color_list = []
+            for n in range(N):
+                color_list.append(next(color_cycler))
+            return color_list
+
+        # Set default colors for when user doesn't provide them
         if mpl.rcParams['_internal.classic_mode']:
-            fillcolor = 'y'
-            linecolor = 'r'
+            default_facecolor = cycle_color('y')
+            default_edgecolor = cycle_color('r')
         else:
-            fillcolor = linecolor = self._get_lines.get_next_color()
+            next_color = self._get_lines.get_next_color()
+            default_facecolor = cycle_color(next_color)
+            default_edgecolor = cycle_color(next_color)
+
+        # Overwrite facecolor and edgecolor if color is provided
+        if color is not None:
+            facecolor = edgecolor = color
+
+        # Convert colors to chain (number of colors can be different from len(vpstats))
+        if facecolor is not None:
+            facecolor = cycle_color(facecolor)
+
+        if edgecolor is not None:
+            edgecolor = cycle_color(edgecolor)
+
+        # Set color of violin plots
+        if facecolor is None:
+            facecolor = default_facecolor
+        if edgecolor is None:
+            edgecolor = default_edgecolor
 
         # Check whether we are rendering vertically or horizontally
         if vert:
             fill = self.fill_betweenx
-            perp_lines = functools.partial(self.hlines, colors=linecolor)
-            par_lines = functools.partial(self.vlines, colors=linecolor)
+            perp_lines = functools.partial(self.hlines, colors=edgecolor)
+            par_lines = functools.partial(self.vlines, colors=edgecolor)
         else:
             fill = self.fill_between
-            perp_lines = functools.partial(self.vlines, colors=linecolor)
-            par_lines = functools.partial(self.hlines, colors=linecolor)
+            perp_lines = functools.partial(self.vlines, colors=edgecolor)
+            par_lines = functools.partial(self.hlines, colors=edgecolor)
 
         # Render violins
         bodies = []
-        for stats, pos, width in zip(vpstats, positions, widths):
+        bodies_zip = zip(vpstats, positions, widths, facecolor)
+        for stats, pos, width, facecol in bodies_zip:
             # The 0.5 factor reflects the fact that we plot from v-p to v+p.
             vals = np.array(stats['vals'])
             vals = 0.5 * width * vals / vals.max()
             bodies += [fill(stats['coords'], -vals + pos, vals + pos,
-                            facecolor=fillcolor, alpha=0.3)]
+                            facecolor=facecol)]
             means.append(stats['mean'])
             mins.append(stats['min'])
             maxes.append(stats['max'])
