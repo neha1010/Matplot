@@ -8920,3 +8920,31 @@ def test_axhvlinespan_interpolation():
     ax.axhline(1, c="C0", alpha=.5)
     ax.axhspan(.8, .9, fc="C1", alpha=.5)
     ax.axhspan(.6, .7, .8, .9, fc="C2", alpha=.5)
+
+
+@image_comparison(["bar_hatchcolor_with_facecolor_and_edgecolor"],
+                  extensions=["png", "pdf"])
+def test_bar_hatchcolor_with_facecolor_and_edgecolor():
+
+    x = [2, 3, 4, 5]
+    y = [1, 3, 1, 4]
+
+    fig, ax = plt.subplots()
+    ax.bar(x, y, hatch="////", facecolor="yellow",
+             hatchcolor="red", edgecolor="blue")
+
+
+@image_comparison(["bar_hatchcolor_with_facecolor"], extensions=["png", "pdf"])
+def test_bar_hatchcolor_with_facecolor():
+    x = [6, 7, 8, 9]
+    y = [2, 4, 7, 3]
+    fig, ax = plt.subplots()
+    ax.bar(x, y, hatch="////", hatchcolor="green", facecolor="red")
+
+
+@image_comparison(["bar_hatchcolor"], extensions=["png", "pdf"])
+def test_bar_hatchcolor():
+    x = [4, 7, 19, 8]
+    y = [1, 5, 8, 14]
+    fig, ax = plt.subplots()
+    ax.bar(x, y, hatch="////", hatchcolor="orange")
