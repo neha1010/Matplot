@@ -188,6 +188,8 @@ discourse server as your own words.  If you think you have found a bug in AI
 generated code, please extract a minimal example that reproduces the same issue
 before reporting a bug.
 
+Using machine translation is acceptable.
+
 .. _get_connected:
 
 Get connected
