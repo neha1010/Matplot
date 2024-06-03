@@ -179,6 +179,15 @@ If you have developed an extension to Matplotlib, please consider adding it to o
 `third party package <https://github.com/matplotlib/mpl-third-party>`_  list.
 
 
+Use of Generative AI
+--------------------
+
+We expect authentic engagement in our community.  Do not post verbatim output
+of Large Language Models or similar AI chatbots as comments on GitHub or our
+discourse server as your own words.  If you think you have found a bug in AI
+generated code, please extract a minimal example that reproduces the same issue
+before reporting a bug.
+
 .. _get_connected:
 
 Get connected
