@@ -184,9 +184,7 @@ Use of Generative AI
 
 We expect authentic engagement in our community.  Do not post verbatim output
 of Large Language Models or similar AI chatbots as comments on GitHub or our
-discourse server as your own words.  If you think you have found a bug in AI
-generated code, please extract a minimal example that reproduces the same issue
-before reporting a bug.
+discourse server as your own words.
 
 Using machine translation is acceptable.
 
