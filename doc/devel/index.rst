@@ -185,9 +185,10 @@ Policies and guidelines
       .. toctree::
          :maxdepth: 1
 
-         document
-         style_guide
-         tag_guidelines
+         document_build
+         document_format
+         document_style
+         document_tag
 
    .. grid-item-card::
       :shadow: none
