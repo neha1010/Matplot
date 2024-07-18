@@ -13,7 +13,7 @@ from collections.abc import Hashable, Sequence
 import pathlib
 from typing import Any, Literal, TypeVar, Union
 
-from . import path
+from . import path, colors
 from ._enums import JoinStyle, CapStyle
 from .markers import MarkerStyle
 
@@ -36,6 +36,8 @@ ColorType = Union[RGBColorType, RGBAColorType]
 RGBColourType = RGBColorType
 RGBAColourType = RGBAColorType
 ColourType = ColorType
+
+ColorMapType = Union[colors.Colormap, colors.BivarColormap, colors.MultivarColormap]
 
 LineStyleType = Union[str, tuple[float, Sequence[float]]]
 DrawStyleType = Literal["default", "steps", "steps-pre", "steps-mid", "steps-post"]

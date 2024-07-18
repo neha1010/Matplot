@@ -27,11 +27,7 @@ from matplotlib._cm import datad
 from matplotlib._cm_listed import cmaps as cmaps_listed
 from matplotlib._cm_multivar import cmap_families as multivar_cmaps
 from matplotlib._cm_bivar import cmaps as bivar_cmaps
-from typing import Union
-
-ColorMapType = Union[colors.Colormap,
-                     colors.BivarColormap,
-                     colors.MultivarColormap]
+from .typing import ColorMapType
 
 _LUTSIZE = mpl.rcParams['image.lut']
 
@@ -227,9 +223,7 @@ class ColormapRegistry(Mapping):
             return self[mpl.rcParams["image.cmap"]]
 
         # if the user passed in a valid colormap type, simply return it
-        if isinstance(cmap, (colors.Colormap,
-                             colors.BivarColormap,
-                             colors.MultivarColormap)):
+        if isinstance(cmap, ColorMapType):
             return cmap
         if isinstance(cmap, str):
             _api.check_in_list(sorted(_colormaps), cmap=cmap)

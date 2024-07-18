@@ -5,10 +5,7 @@ from matplotlib.colorbar import Colorbar
 import numpy as np
 from numpy.typing import ArrayLike
 from typing import Union
-
-ColorMapType = Union[colors.Colormap,
-                     colors.BivarColormap,
-                     colors.MultivarColormap]
+from .typing import ColorMapType
 
 class ColormapRegistry(Mapping[str, ColorMapType]):
     def __init__(self, cmaps: Mapping[str, ColorMapType]) -> None: ...
