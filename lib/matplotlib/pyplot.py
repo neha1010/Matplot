@@ -2573,10 +2573,14 @@ def get_cmap(name: Colormap | str | None = None, lut: int | None = None) -> Colo
     if isinstance(name, Colormap):
         return name
     _api.check_in_list(sorted(_colormaps), name=name)
+
+    # A `cm.ColormapRegistry` can contain Colormap, BivarColormap or MultivarColormap
+    # objects, but `_colormaps` only contains Colormap objects.
+    # We therefore need to use ignore[arg-type, return-value]
     if lut is None:
-        return _colormaps[name]
+        return _colormaps[name]  # type: ignore[return-value]
     else:
-        return _colormaps[name].resampled(lut)
+        return _colormaps[name].resampled(lut)  # type: ignore[arg-type, return-value]
 
 
 def set_cmap(cmap: Colormap | str) -> None:
