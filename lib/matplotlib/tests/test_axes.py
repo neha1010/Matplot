@@ -7538,8 +7538,8 @@ def test_zoom_inset():
     axin1 = ax.inset_axes([0.7, 0.7, 0.35, 0.35])
     # redraw the data in the inset axes...
     axin1.pcolormesh(x, y, z[:-1, :-1])
-    axin1.set_xlim([1.5, 2.15])
-    axin1.set_ylim([2, 2.5])
+    axin1.set_xlim((1.5, 2.15))
+    axin1.set_ylim((2, 2.5))
     axin1.set_aspect(ax.get_aspect())
 
     rec, connectors = ax.indicate_inset_zoom(axin1)

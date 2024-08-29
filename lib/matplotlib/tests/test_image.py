@@ -114,12 +114,12 @@ def test_imshow_zoom(fig_test, fig_ref):
         fig.set_size_inches(2.9, 2.9)
     ax = fig_test.subplots()
     ax.imshow(A, interpolation='auto')
-    ax.set_xlim([10, 20])
-    ax.set_ylim([10, 20])
+    ax.set_xlim((10, 20))
+    ax.set_ylim((10, 20))
     ax = fig_ref.subplots()
     ax.imshow(A, interpolation='nearest')
-    ax.set_xlim([10, 20])
-    ax.set_ylim([10, 20])
+    ax.set_xlim((10, 20))
+    ax.set_ylim((10, 20))
 
 
 @check_figures_equal()
@@ -511,7 +511,7 @@ def test_image_composite_background():
     ax.imshow(arr, extent=[0, 2, 15, 0])
     ax.imshow(arr, extent=[4, 6, 15, 0])
     ax.set_facecolor((1, 0, 0, 0.5))
-    ax.set_xlim([0, 12])
+    ax.set_xlim((0, 12))
 
 
 @image_comparison(['image_composite_alpha'], remove_text=True)
@@ -537,8 +537,8 @@ def test_image_composite_alpha():
     ax.imshow(arr2, extent=[0, 5, 2, 3], alpha=0.6)
     ax.imshow(arr2, extent=[0, 5, 3, 4], alpha=0.3)
     ax.set_facecolor((0, 0.5, 0, 1))
-    ax.set_xlim([0, 5])
-    ax.set_ylim([5, 0])
+    ax.set_xlim((0, 5))
+    ax.set_ylim((5, 0))
 
 
 @check_figures_equal(extensions=["pdf"])
