@@ -64,21 +64,28 @@ annotate_rect(axs[0])
 # one you use depends on the shape of the image and the size of the figure.
 # We can control the relative sizes using the *width_ratios* argument *if* the images
 # are wider than they are tall and shown side by side, as is the case here.
+#
+# While we are making changes, let us also make the aspect ratio of the figure closer
+# to the aspect ratio of the axes using *figsize* so that the figure does not have so
+# much white space.
 
-fig, axs = plt.subplots(1, 2, width_ratios=[300/200, 1], facecolor='aliceblue')
+figsize = (6.4, 2)  # approximate figsize that trims some of the white space.
+
+fig, axs = plt.subplots(1, 2, width_ratios=[300/200, 1],
+                        figsize=figsize, facecolor='aliceblue')
 
 axs[0].imshow(A, vmin=-1, vmax=1)
 annotate_rect(axs[0])
 
 axs[1].imshow(B, vmin=-1, vmax=1)
-
 # %%
 # Given that the data subsample is in the upper left of the larger image,
 # it might make sense if the top of the smaller Axes aligned with the top of the larger.
 # This can be done manually by using `~.Axes.set_anchor`, and using "NW" (for
 # northwest).
 
-fig, axs = plt.subplots(1, 2, width_ratios=[300/200, 1], facecolor='aliceblue')
+fig, axs = plt.subplots(1, 2, width_ratios=[300/200, 1],
+                        figsize=figsize, facecolor='aliceblue')
 
 axs[0].imshow(A, vmin=-1, vmax=1)
 annotate_rect(axs[0])
@@ -88,21 +95,22 @@ axs[1].imshow(B, vmin=-1, vmax=1)
 axs[1].set_anchor('NW')
 
 # %%
-# Note that this procedure still leaves large white spaces (that can be trimmed
-# in a final product by ``bbox_inches="tight"`` in `~.Figure.savefig`), and is
-# not very general.  For instance, if the axes had been arranged vertically
-# instead of horizontally, setting the height aspect ratio would not have
-# helped because the axes are wider than they are tall. For more complicated
-# situations it is necessary to place the axes manually.
+# For more complicated situations it may be necessary to place the axes
+# manually. In the example above, even approximating figure aspect ratio, there
+# are still blank spaces (that can be trimmed in a final product by
+# ``bbox_inches="tight"`` in `~.Figure.savefig`). The procedure is also not
+# very general.  For instance, if the axes had been arranged vertically instead
+# of horizontally, setting the height aspect ratio would not have helped
+# because the axes are wider than they are tall.
 #
 # Manual placement
 # ================
 #
 # We can manually place axes when they are created by passing a position to
-# `~.Figure.add_axes`.  This position takes the form ``[left bottom width height]`` and
-# is in units that are a fraction of the figure width and height. Here we decide how
-# large to make the axes based on the size of the images, and add a small buffer of
-# 0.35 inches.  We do all this at 100 dpi.
+# `~.Figure.add_axes`.  This position takes the form ``[left bottom width
+# height]`` and is in units that are a fraction of the figure width and height.
+# Here we decide how large to make the axes based on the size of the images,
+# and add a small buffer of 0.35 inches.  We do all this at 100 dpi.
 
 dpi = 100  # 100 pixels is one inch
 
@@ -140,7 +148,7 @@ annotate_rect(ax)
 ax = fig.add_axes([posB[0] / fig_width, posB[1] / fig_height,
                    posB[2] / fig_width, posB[3] / fig_height])
 ax.imshow(B, vmin=-1, vmax=1)
-
+plt.show()
 # %%
 # Inspection of the image will show that it is exactly 3* 35 + 300 + 200 = 605
 # pixels wide, and 2 * 35 + 100 = 170 pixels high (or twice that if the 2x
