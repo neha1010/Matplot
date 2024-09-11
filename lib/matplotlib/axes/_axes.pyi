@@ -295,7 +295,7 @@ class Axes(_AxesBase):
         orientation: Literal["vertical", "horizontal"] = ...,
         colors: Iterable[ColorType] | None = ...,
         **kwargs
-    ) -> None: ...
+    ) -> list[BarContainer]: ...
     def stem(
         self,
         *args: ArrayLike | str,
