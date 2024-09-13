@@ -2265,7 +2265,7 @@ class _AxesBase(martist.Artist):
 
     def add_child_axes(self, ax):
         """
-        Add an `.AxesBase` to the Axes' children; return the child Axes.
+        Add an `.Axes` to the Axes' children; return the child Axes.
 
         This is the lowlevel version.  See `.axes.Axes.inset_axes`.
         """
@@ -2524,7 +2524,7 @@ class _AxesBase(martist.Artist):
 
     def update_datalim(self, xys, updatex=True, updatey=True):
         """
-        Extend the `~.Axes.dataLim` Bbox to include the given points.
+        Extend the ``Axes.dataLim`` Bbox to include the given points.
 
         If no data is set currently, the Bbox will ignore its limits and set
         the bound to be the bounds of the xydata (*xys*). Otherwise, it will
