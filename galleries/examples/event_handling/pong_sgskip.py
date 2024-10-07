@@ -134,7 +134,7 @@ class Game:
         # create the initial line
         self.ax = ax
         ax.xaxis.set_visible(False)
-        ax.set_xlim([0, 7])
+        ax.set_xlim((0, 7))
         ax.yaxis.set_visible(False)
         ax.set_ylim([-1, 1])
         pad_a_x = 0

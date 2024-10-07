@@ -485,7 +485,7 @@ new styling parameters for the added handles.
     ax = ax_old
     valmin = 0
     valinit = 0.5
-    ax.set_xlim([0, 1])
+    ax.set_xlim((0, 1))
     ax_old.axvspan(valmin, valinit, 0, 1)
     ax.axvline(valinit, 0, 1, color="r", lw=1)
     ax.set_xticks([])

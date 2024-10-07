@@ -6879,7 +6879,7 @@ def shared_axes_generator(request):
         ax = ax_lst[0][0]
     elif request.param == 'add_axes':
         fig = plt.figure()
-        ax = fig.add_axes([.1, .1, .8, .8])
+        ax = fig.add_axes((.1, .1, .8, .8))
     return fig, ax
 
 
@@ -7580,8 +7580,8 @@ def test_zoom_inset():
     axin1 = ax.inset_axes([0.7, 0.7, 0.35, 0.35])
     # redraw the data in the inset axes...
     axin1.pcolormesh(x, y, z[:-1, :-1])
-    axin1.set_xlim([1.5, 2.15])
-    axin1.set_ylim([2, 2.5])
+    axin1.set_xlim((1.5, 2.15))
+    axin1.set_ylim((2, 2.5))
     axin1.set_aspect(ax.get_aspect())
 
     with pytest.warns(mpl.MatplotlibDeprecationWarning):
@@ -8177,7 +8177,7 @@ def test_aspect_nonlinear_adjustable_box():
 def test_aspect_nonlinear_adjustable_datalim():
     fig = plt.figure(figsize=(10, 10))  # Square.
 
-    ax = fig.add_axes([.1, .1, .8, .8])  # Square.
+    ax = fig.add_axes((.1, .1, .8, .8))  # Square.
     ax.plot([.4, .6], [.4, .6])  # Set minpos to keep logit happy.
     ax.set(xscale="log", xlim=(1, 100),
            yscale="logit", ylim=(1 / 101, 1 / 11),
@@ -8401,7 +8401,7 @@ def test_multiplot_autoscale():
 def test_sharing_does_not_link_positions():
     fig = plt.figure()
     ax0 = fig.add_subplot(221)
-    ax1 = fig.add_axes([.6, .6, .3, .3], sharex=ax0)
+    ax1 = fig.add_axes((.6, .6, .3, .3), sharex=ax0)
     init_pos = ax1.get_position()
     fig.subplots_adjust(left=0)
     assert (ax1.get_position().get_points() == init_pos.get_points()).all()
