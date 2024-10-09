@@ -551,6 +551,9 @@ class _AxesBase(martist.Artist):
 
     _subclass_uses_cla = False
 
+    dataLim: mtransforms.Bbox
+    """The bounding `.Bbox` enclosing all data displayed in the Axes."""
+
     @property
     def _axis_map(self):
         """A mapping of axis names, e.g. 'x', to `Axis` instances."""
@@ -777,8 +780,8 @@ class _AxesBase(martist.Artist):
             if titles:
                 fields += [f"title={titles}"]
         for name, axis in self._axis_map.items():
-            if axis.get_label() and axis.get_label().get_text():
-                fields += [f"{name}label={axis.get_label().get_text()!r}"]
+            if axis.label and axis.label.get_text():
+                fields += [f"{name}label={axis.label.get_text()!r}"]
         return f"<{self.__class__.__name__}: " + ", ".join(fields) + ">"
 
     def get_subplotspec(self):
@@ -849,6 +852,7 @@ class _AxesBase(martist.Artist):
 
     @property
     def viewLim(self):
+        """The view limits as `.Bbox` in data coordinates."""
         self._unstale_viewLim()
         return self._viewLim
 
@@ -1709,7 +1713,8 @@ class _AxesBase(martist.Artist):
         ----------
         adjustable : {'box', 'datalim'}
             If 'box', change the physical dimensions of the Axes.
-            If 'datalim', change the ``x`` or ``y`` data limits.
+            If 'datalim', change the ``x`` or ``y`` data limits. This
+            may ignore explicitly defined axis limits.
 
         share : bool, default: False
             If ``True``, apply the settings to all shared Axes.
@@ -2026,11 +2031,17 @@ class _AxesBase(martist.Artist):
             yc = 0.5 * (ymin + ymax)
             y0 = yc - Ysize / 2.0
             y1 = yc + Ysize / 2.0
+            if not self.get_autoscaley_on():
+                _log.warning("Ignoring fixed y limits to fulfill fixed data aspect "
+                             "with adjustable data limits.")
             self.set_ybound(y_trf.inverted().transform([y0, y1]))
         else:
             xc = 0.5 * (xmin + xmax)
             x0 = xc - Xsize / 2.0
             x1 = xc + Xsize / 2.0
+            if not self.get_autoscalex_on():
+                _log.warning("Ignoring fixed x limits to fulfill fixed data aspect "
+                             "with adjustable data limits.")
             self.set_xbound(x_trf.inverted().transform([x0, x1]))
 
     def axis(self, arg=None, /, *, emit=True, **kwargs):
@@ -2247,8 +2258,8 @@ class _AxesBase(martist.Artist):
 
         Use `add_artist` only for artists for which there is no dedicated
         "add" method; and if necessary, use a method such as `update_datalim`
-        to manually update the dataLim if the artist is to be included in
-        autoscaling.
+        to manually update the `~.Axes.dataLim` if the artist is to be included
+        in autoscaling.
 
         If no ``transform`` has been specified when creating the artist (e.g.
         ``artist.get_transform() == None``) then the transform is set to
@@ -2265,7 +2276,7 @@ class _AxesBase(martist.Artist):
 
     def add_child_axes(self, ax):
         """
-        Add an `.AxesBase` to the Axes' children; return the child Axes.
+        Add an `.Axes` to the Axes' children; return the child Axes.
 
         This is the lowlevel version.  See `.axes.Axes.inset_axes`.
         """
@@ -2361,7 +2372,7 @@ class _AxesBase(martist.Artist):
 
     def _update_line_limits(self, line):
         """
-        Figures out the data limit of the given line, updating self.dataLim.
+        Figures out the data limit of the given line, updating `.Axes.dataLim`.
         """
         path = line.get_path()
         if path.vertices.size == 0:
@@ -2736,19 +2747,22 @@ class _AxesBase(martist.Artist):
 
     def margins(self, *margins, x=None, y=None, tight=True):
         """
-        Set or retrieve autoscaling margins.
+        Set or retrieve margins around the data for autoscaling axis limits.
 
-        The padding added to each limit of the Axes is the *margin*
-        times the data interval. All input parameters must be floats
-        greater than -0.5. Passing both positional and keyword
-        arguments is invalid and will raise a TypeError. If no
-        arguments (positional or otherwise) are provided, the current
+        This allows to configure the padding around the data without having to
+        set explicit limits using `~.Axes.set_xlim` / `~.Axes.set_ylim`.
+
+        Autoscaling determines the axis limits by adding *margin* times the
+        data interval as padding around the data. See the following illustration:
+
+        .. plot:: _embedded_plots/axes_margins.py
+
+        All input parameters must be floats greater than -0.5. Passing both
+        positional and keyword arguments is invalid and will raise a TypeError.
+        If no arguments (positional or otherwise) are provided, the current
         margins will remain unchanged and simply be returned.
 
-        Specifying any margin changes only the autoscaling; for example,
-        if *xmargin* is not None, then *xmargin* times the X data
-        interval will be added to each end of that interval before
-        it is used in autoscaling.
+        The default margins are :rc:`axes.xmargin` and :rc:`axes.ymargin`.
 
         Parameters
         ----------
@@ -2780,10 +2794,14 @@ class _AxesBase(martist.Artist):
         Notes
         -----
         If a previously used Axes method such as :meth:`pcolor` has set
-        :attr:`use_sticky_edges` to `True`, only the limits not set by
-        the "sticky artists" will be modified. To force all of the
-        margins to be set, set :attr:`use_sticky_edges` to `False`
+        `~.Axes.use_sticky_edges` to `True`, only the limits not set by
+        the "sticky artists" will be modified. To force all
+        margins to be set, set `~.Axes.use_sticky_edges` to `False`
         before calling :meth:`margins`.
+
+        See Also
+        --------
+        .Axes.set_xmargin, .Axes.set_ymargin
         """
 
         if margins and (x is not None or y is not None):
@@ -3235,7 +3253,7 @@ class _AxesBase(martist.Artist):
             axis.set_zorder(zorder)
         self.stale = True
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def grid(self, visible=None, which='major', axis='both', **kwargs):
         """
         Configure the grid lines.
@@ -3510,7 +3528,7 @@ class _AxesBase(martist.Artist):
         """
         Get the xlabel text string.
         """
-        label = self.xaxis.get_label()
+        label = self.xaxis.label
         return label.get_text()
 
     def set_xlabel(self, xlabel, fontdict=None, labelpad=None, *,
@@ -3763,7 +3781,7 @@ class _AxesBase(martist.Artist):
         """
         Get the ylabel text string.
         """
-        label = self.yaxis.get_label()
+        label = self.yaxis.label
         return label.get_text()
 
     def set_ylabel(self, ylabel, fontdict=None, labelpad=None, *,

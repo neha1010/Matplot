@@ -536,7 +536,7 @@ def _find_closest_point_on_path(xys, p):
     return (d2s[imin], projs[imin], (imin, imin+1))
 
 
-_docstring.interpd.update(contour_set_attributes=r"""
+_docstring.interpd.register(contour_set_attributes=r"""
 Attributes
 ----------
 ax : `~matplotlib.axes.Axes`
@@ -555,7 +555,7 @@ layers : array
 """)
 
 
-@_docstring.dedent_interpd
+@_docstring.interpd
 class ContourSet(ContourLabeler, mcoll.Collection):
     """
     Store a set of contour lines or filled regions.
@@ -703,6 +703,11 @@ class ContourSet(ContourLabeler, mcoll.Collection):
         self._extend_min = self.extend in ['min', 'both']
         self._extend_max = self.extend in ['max', 'both']
         if self.colors is not None:
+            if mcolors.is_color_like(self.colors):
+                color_sequence = [self.colors]
+            else:
+                color_sequence = self.colors
+
             ncolors = len(self.levels)
             if self.filled:
                 ncolors -= 1
@@ -719,19 +724,19 @@ class ContourSet(ContourLabeler, mcoll.Collection):
             total_levels = (ncolors +
                             int(self._extend_min) +
                             int(self._extend_max))
-            if (len(self.colors) == total_levels and
+            if (len(color_sequence) == total_levels and
                     (self._extend_min or self._extend_max)):
                 use_set_under_over = True
                 if self._extend_min:
                     i0 = 1
 
-            cmap = mcolors.ListedColormap(self.colors[i0:None], N=ncolors)
+            cmap = mcolors.ListedColormap(color_sequence[i0:None], N=ncolors)
 
             if use_set_under_over:
                 if self._extend_min:
-                    cmap.set_under(self.colors[0])
+                    cmap.set_under(color_sequence[0])
                 if self._extend_max:
-                    cmap.set_over(self.colors[-1])
+                    cmap.set_over(color_sequence[-1])
 
         # label lists must be initialized here
         self.labelTexts = []
@@ -1264,7 +1269,7 @@ class ContourSet(ContourLabeler, mcoll.Collection):
                 super().draw(renderer)
 
 
-@_docstring.dedent_interpd
+@_docstring.interpd
 class QuadContourSet(ContourSet):
     """
     Create and store a set of contour lines or filled regions.
@@ -1445,7 +1450,7 @@ class QuadContourSet(ContourSet):
         return np.meshgrid(x, y)
 
 
-_docstring.interpd.update(contour_doc="""
+_docstring.interpd.register(contour_doc="""
 `.contour` and `.contourf` draw contour lines and filled contours,
 respectively.  Except as noted, function signatures and return values
 are the same for both versions.
@@ -1499,10 +1504,12 @@ colors : :mpltype:`color` or list of :mpltype:`color`, optional
     The sequence is cycled for the levels in ascending order. If the
     sequence is shorter than the number of levels, it's repeated.
 
-    As a shortcut, single color strings may be used in place of
-    one-element lists, i.e. ``'red'`` instead of ``['red']`` to color
-    all levels with the same color. This shortcut does only work for
-    color strings, not for other ways of specifying colors.
+    As a shortcut, a single color may be used in place of one-element lists, i.e.
+    ``'red'`` instead of ``['red']`` to color all levels with the same color.
+
+    .. versionchanged:: 3.10
+        Previously a single color had to be expressed as a string, but now any
+        valid color format may be passed.
 
     By default (value *None*), the colormap specified by *cmap*
     will be used.
@@ -1570,10 +1577,10 @@ extend : {'neither', 'both', 'min', 'max'}, default: 'neither'
 
         An existing `.QuadContourSet` does not get notified if
         properties of its colormap are changed. Therefore, an explicit
-        call `.QuadContourSet.changed()` is needed after modifying the
+        call ``QuadContourSet.changed()`` is needed after modifying the
         colormap. The explicit call can be left out, if a colorbar is
         assigned to the `.QuadContourSet` because it internally calls
-        `.QuadContourSet.changed()`.
+        ``QuadContourSet.changed()``.
 
     Example::
 
@@ -1636,7 +1643,7 @@ negative_linestyles : {*None*, 'solid', 'dashed', 'dashdot', 'dotted'}, \
     specifies the line style for negative contours.
 
     If *negative_linestyles* is *None*, the default is taken from
-    :rc:`contour.negative_linestyles`.
+    :rc:`contour.negative_linestyle`.
 
     *negative_linestyles* can also be an iterable of the above strings
     specifying a set of linestyles to be used. If this iterable is shorter than
