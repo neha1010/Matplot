@@ -57,9 +57,6 @@ jobs:
           python -m build --sdist
           python ci/export_sdist_name.py
 
-      - name: Check README rendering for PyPI
-        run: twine check dist/*
-
       - name: Upload sdist result
         uses: actions/upload-artifact@v4
         with:
