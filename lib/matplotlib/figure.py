@@ -6,9 +6,8 @@
     Many methods are implemented in `FigureBase`.
 
 `SubFigure`
-    A logical figure inside a figure, usually added to a figure (or parent
-    `SubFigure`) with `Figure.add_subfigure` or `Figure.subfigures` methods
-    (provisional API v3.4).
+    A logical figure inside a figure, usually added to a figure (or parent `SubFigure`)
+    with `Figure.add_subfigure` or `Figure.subfigures` methods.
 
 Figures are typically created using pyplot methods `~.pyplot.figure`,
 `~.pyplot.subplots`, and `~.pyplot.subplot_mosaic`.
@@ -527,7 +526,7 @@ default: %(va)s
         self.stale = True
         return artist
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def add_axes(self, *args, **kwargs):
         """
         Add an `~.axes.Axes` to the figure.
@@ -614,22 +613,22 @@ default: %(va)s
         """
 
         if not len(args) and 'rect' not in kwargs:
-            raise TypeError(
-                "add_axes() missing 1 required positional argument: 'rect'")
+            raise TypeError("add_axes() missing 1 required positional argument: 'rect'")
         elif 'rect' in kwargs:
             if len(args):
-                raise TypeError(
-                    "add_axes() got multiple values for argument 'rect'")
+                raise TypeError("add_axes() got multiple values for argument 'rect'")
             args = (kwargs.pop('rect'), )
+        if len(args) != 1:
+            raise _api.nargs_error("add_axes", 1, len(args))
 
         if isinstance(args[0], Axes):
-            a, *extra_args = args
+            a, = args
             key = a._projection_init
             if a.get_figure(root=False) is not self:
                 raise ValueError(
                     "The Axes must have been created in the present figure")
         else:
-            rect, *extra_args = args
+            rect, = args
             if not np.isfinite(rect).all():
                 raise ValueError(f'all entries in rect must be finite not {rect}')
             projection_class, pkw = self._process_projection_requirements(**kwargs)
@@ -638,14 +637,9 @@ default: %(va)s
             a = projection_class(self, rect, **pkw)
             key = (projection_class, pkw)
 
-        if extra_args:
-            _api.warn_deprecated(
-                "3.8",
-                name="Passing more than one positional argument to Figure.add_axes",
-                addendum="Any additional positional arguments are currently ignored.")
         return self._add_axes_internal(a, key)
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def add_subplot(self, *args, **kwargs):
         """
         Add an `~.axes.Axes` to the figure as part of a subplot arrangement.
@@ -1024,7 +1018,7 @@ default: %(va)s
     #    " legend(" -> " figlegend(" for the signatures
     #    "fig.legend(" -> "plt.figlegend" for the code examples
     #    "ax.plot" -> "plt.plot" for consistency in using pyplot when able
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def legend(self, *args, **kwargs):
         """
         Place a legend on the figure.
@@ -1144,7 +1138,7 @@ default: %(va)s
         self.stale = True
         return l
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def text(self, x, y, s, fontdict=None, **kwargs):
         """
         Add text to figure.
@@ -1194,7 +1188,7 @@ default: %(va)s
         self.stale = True
         return text
 
-    @_docstring.dedent_interpd
+    @_docstring.interpd
     def colorbar(
             self, mappable, cax=None, ax=None, use_gridspec=True, **kwargs):
         """
@@ -1321,6 +1315,8 @@ default: %(va)s
 
         Unset parameters are left unmodified; initial values are given by
         :rc:`figure.subplot.[name]`.
+
+        .. plot:: _embedded_plots/figure_subplots_adjust.py
 
         Parameters
         ----------
@@ -1607,9 +1603,6 @@ default: %(va)s
         A subfigure has the same artist methods as a figure, and is logically
         the same as a figure, but cannot print itself.
         See :doc:`/gallery/subplots_axes_and_figures/subfigures`.
-
-        .. note::
-            The *subfigure* concept is new in v3.4, and the API is still provisional.
 
         .. versionchanged:: 3.10
             subfigures are now added in row-major order.
@@ -2229,9 +2222,6 @@ class SubFigure(FigureBase):
         axsR = sfigs[1].subplots(2, 1)
 
     See :doc:`/gallery/subplots_axes_and_figures/subfigures`
-
-    .. note::
-        The *subfigure* concept is new in v3.4, and the API is still provisional.
     """
 
     def __init__(self, parent, subplotspec, *,

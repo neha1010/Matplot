@@ -1178,26 +1178,12 @@ class Event:
     def __init__(self, name, canvas, guiEvent=None):
         self.name = name
         self.canvas = canvas
-        self._guiEvent = guiEvent
-        self._guiEvent_deleted = False
+        self.guiEvent = guiEvent
 
     def _process(self):
         """Process this event on ``self.canvas``, then unset ``guiEvent``."""
         self.canvas.callbacks.process(self.name, self)
-        self._guiEvent_deleted = True
-
-    @property
-    def guiEvent(self):
-        # After deprecation elapses: remove _guiEvent_deleted; make guiEvent a plain
-        # attribute set to None by _process.
-        if self._guiEvent_deleted:
-            _api.warn_deprecated(
-                "3.8", message="Accessing guiEvent outside of the original GUI event "
-                "handler is unsafe and deprecated since %(since)s; in the future, the "
-                "attribute will be set to None after quitting the event handler.  You "
-                "may separately record the value of the guiEvent attribute at your own "
-                "risk.")
-        return self._guiEvent
+        self.guiEvent = None
 
 
 class DrawEvent(Event):
@@ -1271,10 +1257,6 @@ class LocationEvent(Event):
         The keyboard modifiers currently being pressed (except for KeyEvent).
     """
 
-    # Fully delete all occurrences of lastevent after deprecation elapses.
-    _lastevent = None
-    lastevent = _api.deprecated("3.8")(
-        _api.classproperty(lambda cls: cls._lastevent))
     _last_axes_ref = None
 
     def __init__(self, name, canvas, x, y, guiEvent=None, *, modifiers=None):
@@ -1527,8 +1509,6 @@ def _mouse_handler(event):
                 event.canvas.callbacks.process("axes_enter_event", event)
         LocationEvent._last_axes_ref = (
             weakref.ref(event.inaxes) if event.inaxes else None)
-        LocationEvent._lastevent = (
-            None if event.name == "figure_leave_event" else event)
 
 
 def _get_renderer(figure, print_method=None):
@@ -2103,12 +2083,6 @@ class FigureCanvasBase:
         if dpi == 'figure':
             dpi = getattr(self.figure, '_original_dpi', self.figure.dpi)
 
-        if kwargs.get("papertype") == 'auto':
-            # When deprecation elapses, remove backend_ps._get_papertype & its callers.
-            _api.warn_deprecated(
-                "3.8", name="papertype='auto'", addendum="Pass an explicit paper type, "
-                "'figure', or omit the *papertype* argument entirely.")
-
         # Remove the figure manager, if any, to avoid resizing the GUI widget.
         with (cbook._setattr_cm(self, manager=None),
               self._switch_canvas_and_return_print_method(format, backend)
@@ -2212,20 +2186,6 @@ class FigureCanvasBase:
             {ord(c): "_" for c in removed_chars})
         default_filetype = self.get_default_filetype()
         return f'{default_basename}.{default_filetype}'
-
-    @_api.deprecated("3.8")
-    def switch_backends(self, FigureCanvasClass):
-        """
-        Instantiate an instance of FigureCanvasClass
-
-        This is used for backend switching, e.g., to instantiate a
-        FigureCanvasPS from a FigureCanvasGTK.  Note, deep copying is
-        not done, so any changes to one of the instances (e.g., setting
-        figure size or line props), will be reflected in the other
-        """
-        newCanvas = FigureCanvasClass(self.figure)
-        newCanvas._is_saving = self._is_saving
-        return newCanvas
 
     def mpl_connect(self, s, func):
         """
@@ -3339,7 +3299,7 @@ class ToolContainerBase:
                 _api.warn_deprecated(
                     "3.9", message=f"Loading icon {tool.image!r} from the current "
                     "directory or from Matplotlib's image directory.  This behavior "
-                    "is deprecated since %(since)s and will be removed %(removal)s; "
+                    "is deprecated since %(since)s and will be removed in %(removal)s; "
                     "Tool.image should be set to a path relative to the Tool's source "
                     "file, or to an absolute path.")
                 return os.path.abspath(fname)
