@@ -71,7 +71,11 @@ class Patch(artist.Artist):
         if joinstyle is None:
             joinstyle = JoinStyle.miter
 
-        self._hatch_color = colors.to_rgba(mpl.rcParams['hatch.color'])
+        hatch_color = mpl.rcParams['hatch.color']
+        if hatch_color == 'inherit':
+            hatch_color = mpl.rcParams['patch.edgecolor']
+        self._hatch_color = colors.to_rgba(hatch_color)
+
         self._fill = bool(fill)  # needed for set_facecolor call
         if color is not None:
             if edgecolor is not None or facecolor is not None:
