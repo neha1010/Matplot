@@ -1361,3 +1361,104 @@ def test_striped_lines(fig_test, fig_ref, gapcolor):
     for x, gcol, ls in zip(x, itertools.cycle(gapcolor),
                            itertools.cycle(linestyles)):
         ax_ref.axvline(x, 0, 1, linewidth=20, linestyle=ls, gapcolor=gcol, alpha=0.5)
+
+
+def test_collection_hatchcolor_fallback_logic():
+    from matplotlib.collections import PathCollection
+
+    path = mpath.Path.unit_rectangle()
+
+    # Test when hatchcolor parameter is passed
+    coll = PathCollection([path] * 2, hatch='//', hatchcolor=['r', 'b'])
+    assert_array_equal(coll.get_hatchcolor(),
+                       [mpl.colors.to_rgba(c) for c in ('r', 'b')])
+
+    # Test that hatchcolor parameter takes precedence over rcParam
+    # when edgecolor is not set
+    with mpl.rc_context({'hatch.color': 'green'}):
+        coll = PathCollection([path], hatch='//', hatchcolor='red')
+    assert_array_equal(coll.get_hatchcolor(), [mpl.colors.to_rgba('red')])
+    # when edgecolor is set
+    with mpl.rc_context({'hatch.color': 'green'}):
+        coll = PathCollection([path], hatch='//', edgecolor='blue',
+                                              hatchcolor='red')
+    assert_array_equal(coll.get_hatchcolor(), [mpl.colors.to_rgba('red')])
+
+    # Test that hatchcolor is not overridden by edgecolor when
+    # hatchcolor parameter is not passed and hatch.color rcParam is set to a color
+    with mpl.rc_context({'hatch.color': 'green'}):
+        coll = PathCollection([path], hatch='//', edgecolor='blue')
+    assert_array_equal(coll.get_hatchcolor(), [mpl.colors.to_rgba('green')])
+
+    # Test that hatchcolor inherits edgecolor when
+    # hatchcolor parameter is not passed and hatch.color rcParam is set to 'inherit'
+    with mpl.rc_context({'hatch.color': 'inherit'}):
+        coll = PathCollection([path], hatch='//', edgecolor='blue')
+    assert_array_equal(coll.get_hatchcolor(), [mpl.colors.to_rgba('blue')])
+
+    # Test for default hatchcolor when hatchcolor parameter is not passed and
+    # hatch.color rcParam is set to 'inherit' and edgecolor is not set
+    with mpl.rc_context({'hatch.color': 'inherit'}):
+        coll = PathCollection([path], hatch='//')
+    assert_array_equal(coll.get_hatchcolor(),
+                       [mpl.colors.to_rgba(mpl.rcParams['patch.edgecolor'])])
+
+    # Test for hatch color when edgecolor is set to 'face' and hatchcolor is not set
+    coll = PathCollection([path], hatch='//', edgecolor='face')
+    assert_array_equal(coll.get_hatchcolor(),
+                       [mpl.colors.to_rgba(mpl.rcParams['patch.edgecolor'])])
+
+    # Test for hatch color when edgecolor is set to 'none' and hatchcolor is not set
+    coll = PathCollection([path], hatch='//', edgecolor='none')
+    assert_array_equal(coll.get_hatchcolor(),
+                          [mpl.colors.to_rgba(mpl.rcParams['patch.edgecolor'])])
+
+
+@check_figures_equal(extensions=['png', 'pdf', 'svg', 'eps'], tol=0.027)
+def test_collection_hatchcolor_inherit_logic(fig_test, fig_ref):
+    from matplotlib.collections import PathCollection
+    from matplotlib.path import Path
+
+    ax_test = fig_test.subplots()
+    ax_ref = fig_ref.subplots()
+
+    path = Path.unit_rectangle().deepcopy()
+    path.vertices *= [0.2, 0.2]
+
+    with mpl.rc_context({'hatch.color': 'inherit'}):
+        colors_1 = ['purple', 'red', 'green', 'yellow']
+        colors_2 = ['orange', 'cyan', 'blue', 'magenta']
+
+        # Test for when edgecolor and hatchcolor is set
+        # fig_ref uses a workaround to set the hatchcolor different from the edgecolor
+        p = [Path(path.vertices + [0.3, 0.05 + 0.25 * i]) for i in range(4)]
+        ax_ref.add_collection(PathCollection(p, hatch='//', lw=0, edgecolor=colors_1))
+        ax_ref.add_collection(PathCollection(p, fc='none', edgecolor=colors_2))
+        ax_test.add_collection(PathCollection(p, hatch='//', edgecolor=colors_2,
+                                              hatchcolor=colors_1))
+
+        # Test for explicitly setting edgecolor and then hatchcolor
+        p = [Path(e.vertices + [0.25, 0]) for e in p]
+        ax_ref.add_collection(PathCollection(p, hatch='//', lw=0, edgecolor=colors_1))
+        ax_ref.add_collection(PathCollection(p, fc='none', edgecolor=colors_2))
+        col = PathCollection(p, hatch='//')
+        col.set_edgecolor(colors_2)
+        assert_array_equal(col.get_hatchcolor(),
+                           [mpl.colors.to_rgba(c) for c in colors_2])
+        col.set_hatchcolor(colors_1)
+        assert_array_equal(col.get_hatchcolor(),
+                           [mpl.colors.to_rgba(c) for c in colors_1])
+        ax_test.add_collection(col)
+
+        # Test for explicitly setting hatchcolor and then edgecolor
+        p = [Path(e.vertices + [0.25, 0]) for e in p]
+        ax_ref.add_collection(PathCollection(p, hatch='//', lw=0, edgecolor=colors_1))
+        ax_ref.add_collection(PathCollection(p, fc='none', edgecolor=colors_2))
+        col = PathCollection(p, hatch='//')
+        col.set_hatchcolor(colors_1)
+        assert_array_equal(col.get_hatchcolor(),
+                           [mpl.colors.to_rgba(c) for c in colors_1])
+        col.set_edgecolor(colors_2)
+        assert_array_equal(col.get_hatchcolor(),
+                           [mpl.colors.to_rgba(c) for c in colors_1])
+        ax_test.add_collection(col)
