@@ -1728,3 +1728,37 @@ def test_colorizer_vmin_vmax():
     assert ca.vmax == 3.0
     assert ca.norm.vmin == 1.0
     assert ca.norm.vmax == 3.0
+
+
+def test_lsc_from_list_color_alpha_tuple():
+    """
+    GitHub issue #29042: A bug in 'from_list' causes an error
+    when passing a tuple (str, float) where the string is a
+    color name or grayscale value and float is an alpha value.
+    """
+    valid_colors = [("red", 0.3), ("0.42", 0.1), "green"]
+    mcolors.LinearSegmentedColormap.from_list("testcolormap", valid_colors)
+
+
+def test_lsc_from_list_mixed_tuples():
+    invalid_color_list = [(0.42, "blue"), (0.1, 0.1, 0.1, 0.1)]
+    with pytest.raises(ValueError):
+        mcolors.LinearSegmentedColormap.from_list("testcolormap", invalid_color_list)
+    color_first = ["blue", (0.42, "red")]
+    with pytest.raises(TypeError):
+        mcolors.LinearSegmentedColormap.from_list("testcolormap2", color_first)
+
+
+def test_lsc_from_list_invalid_color():
+    invalid_color_list = [
+        "blue",
+        (0.1, 0.1, 0.1, 0.1),
+        ("red", 2),  # invalid color, see 'is_color_like'
+    ]
+    with pytest.raises(ValueError):
+        mcolors.LinearSegmentedColormap.from_list("testcolormap", invalid_color_list)
+
+
+def test_lsc_from_list_value_color_tuple():
+    value_color_tuples = [(0.42, "red"), (0.6, "blue"), (1, "green")]
+    mcolors.LinearSegmentedColormap.from_list("testcolormap", value_color_tuples)

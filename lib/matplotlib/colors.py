@@ -1099,14 +1099,37 @@ class LinearSegmentedColormap(Colormap):
         if not np.iterable(colors):
             raise ValueError('colors must be iterable')
 
-        if (isinstance(colors[0], Sized) and len(colors[0]) == 2
-                and not isinstance(colors[0], str)):
-            # List of value, color pairs
-            vals, colors = zip(*colors)
+        try:
+            # Assume the passed colors are a list of colors
+            # and not a (value, color) tuple.
+            r, g, b, a = to_rgba_array(colors).T
+        except (ValueError, TypeError) as e:
+            # Check whether the first element is a (value, color) tuple
+            if (
+                isinstance(colors[0], Sized)
+                and not isinstance(colors[0], str)
+                and len(colors[0]) == 2
+                and isinstance(colors[0][0], Real)
+                and is_color_like(colors[0][1])
+            ):
+                # Assume the passed values are a list of
+                # (value, color) tuples.
+                try:
+                    vals, _colors = itertools.zip_longest(*colors)
+                except ValueError:
+                    raise ValueError(
+                        "colors is not a valid list of colors "
+                        "or list of (value, color) pairs."
+                    )
+                r, g, b, a = to_rgba_array(_colors).T
+            else:
+                # The first item is not a (value, color) tuple,
+                # so the issue might be an invalid color
+                raise e
         else:
+            # List of value, color pairs
             vals = np.linspace(0, 1, len(colors))
 
-        r, g, b, a = to_rgba_array(colors).T
         cdict = {
             "red": np.column_stack([vals, r, r]),
             "green": np.column_stack([vals, g, g]),
