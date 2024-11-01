@@ -1740,23 +1740,15 @@ def test_lsc_from_list_color_alpha_tuple():
     mcolors.LinearSegmentedColormap.from_list("testcolormap", valid_colors)
 
 
-def test_lsc_from_list_mixed_tuples():
-    invalid_color_list = [(0.42, "blue"), (0.1, 0.1, 0.1, 0.1)]
-    with pytest.raises(ValueError):
-        mcolors.LinearSegmentedColormap.from_list("testcolormap", invalid_color_list)
-    color_first = ["blue", (0.42, "red")]
-    with pytest.raises(TypeError):
-        mcolors.LinearSegmentedColormap.from_list("testcolormap2", color_first)
-
-
-def test_lsc_from_list_invalid_color():
-    invalid_color_list = [
-        "blue",
-        (0.1, 0.1, 0.1, 0.1),
-        ("red", 2),  # invalid color, see 'is_color_like'
-    ]
-    with pytest.raises(ValueError):
-        mcolors.LinearSegmentedColormap.from_list("testcolormap", invalid_color_list)
+@pytest.mark.parametrize("colors, error",
+                         [([(0.42, "blue"), (.1, .1, .1, .1)], ValueError),
+                          (["blue", (0.42, "red")], ValueError),
+                          (["blue", (.1, .1, .1, .1), ("red", 2)], ValueError),
+                          ([(0, "red"), (1.1, "blue")], ValueError),
+                          ([(0.52, "red"), (0.42, "blue")], ValueError)])
+def test_lsc_from_list_invalid_inputs(colors, error):
+    with pytest.raises(error):
+        mcolors.LinearSegmentedColormap.from_list("testcolormap", colors)
 
 
 def test_lsc_from_list_value_color_tuple():
