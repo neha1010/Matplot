@@ -229,15 +229,23 @@ means that the dependencies must be explicitly installed, either by :ref:`creati
 (recommended) or by manually installing the following packages:
 
 - `meson-python <https://meson-python.readthedocs.io/>`_ (>= 0.13.1).
-- `ninja <https://ninja-build.org/>`_ (>= 1.8.2). This may be available in your package
-  manager or bundled with Meson, but may be installed via ``pip`` if otherwise not
-  available.
 - `PyBind11 <https://pypi.org/project/pybind11/>`_ (>= 2.13.2). Used to connect C/C++ code
   with Python.
 - `setuptools_scm <https://pypi.org/project/setuptools-scm/>`_ (>= 7).  Used to
   update the reported ``mpl.__version__`` based on the current git commit.
   Also a runtime dependency for editable installs.
 - `NumPy <https://numpy.org>`_ (>= 1.22).  Also a runtime dependency.
+
+
+.. _ninja-dependencies:
+
+Ninja
+-----
+
+When setting up a virtual environment for development, `ninja <https://ninja-build.org/>`_
+(>= 1.8.2) may need to be installed separately. This may be available in your
+package manager or bundled with Meson, but may be installed via ``pip`` if
+otherwise not available.
 
 
 .. _compile-dependencies:
