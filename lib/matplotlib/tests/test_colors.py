@@ -15,6 +15,7 @@ import matplotlib
 import matplotlib as mpl
 import matplotlib.colors as mcolors
 import matplotlib.colorbar as mcolorbar
+import matplotlib.colorizer as mcolorizer
 import matplotlib.pyplot as plt
 import matplotlib.scale as mscale
 from matplotlib.rcsetup import cycler
@@ -1415,7 +1416,7 @@ def test_ndarray_subclass_norm():
     # which objects when adding or subtracting with other
     # arrays. See #6622 and #8696
     class MyArray(np.ndarray):
-        def __isub__(self, other):  # type: ignore
+        def __isub__(self, other):  # type: ignore[misc]
             raise RuntimeError
 
         def __add__(self, other):
@@ -1715,3 +1716,15 @@ def test_to_rgba_array_none_color_with_alpha_param():
                           (('C3', 0.5), True)])
 def test_is_color_like(input, expected):
     assert is_color_like(input) is expected
+
+
+def test_colorizer_vmin_vmax():
+    ca = mcolorizer.Colorizer()
+    assert ca.vmin is None
+    assert ca.vmax is None
+    ca.vmin = 1
+    ca.vmax = 3
+    assert ca.vmin == 1.0
+    assert ca.vmax == 3.0
+    assert ca.norm.vmin == 1.0
+    assert ca.norm.vmax == 3.0

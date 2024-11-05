@@ -2,10 +2,8 @@
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
 #include "mplutils.h"
-#include "numpy_cpp.h"
 #include "py_converters.h"
 #include "_backend_agg.h"
-#include "py_converters_11.h"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -60,11 +58,37 @@ PyRendererAgg_draw_path(RendererAgg *self,
 static void
 PyRendererAgg_draw_text_image(RendererAgg *self,
                               py::array_t<agg::int8u, py::array::c_style | py::array::forcecast> image_obj,
-                              double x,
-                              double y,
+                              std::variant<double, int> vx,
+                              std::variant<double, int> vy,
                               double angle,
                               GCAgg &gc)
 {
+    int x, y;
+
+    if (auto value = std::get_if<double>(&vx)) {
+        auto api = py::module_::import("matplotlib._api");
+        auto warn = api.attr("warn_deprecated");
+        warn("since"_a="3.10", "name"_a="x", "obj_type"_a="parameter as float",
+             "alternative"_a="int(x)");
+        x = static_cast<int>(*value);
+    } else if (auto value = std::get_if<int>(&vx)) {
+        x = *value;
+    } else {
+        throw std::runtime_error("Should not happen");
+    }
+
+    if (auto value = std::get_if<double>(&vy)) {
+        auto api = py::module_::import("matplotlib._api");
+        auto warn = api.attr("warn_deprecated");
+        warn("since"_a="3.10", "name"_a="y", "obj_type"_a="parameter as float",
+             "alternative"_a="int(y)");
+        y = static_cast<int>(*value);
+    } else if (auto value = std::get_if<int>(&vy)) {
+        y = *value;
+    } else {
+        throw std::runtime_error("Should not happen");
+    }
+
     // TODO: This really shouldn't be mutable, but Agg's renderer buffers aren't const.
     auto image = image_obj.mutable_unchecked<2>();
 
@@ -187,16 +211,8 @@ PyRendererAgg_draw_gouraud_triangles(RendererAgg *self,
     self->draw_gouraud_triangles(gc, points, colors, trans);
 }
 
-PYBIND11_MODULE(_backend_agg, m)
+PYBIND11_MODULE(_backend_agg, m, py::mod_gil_not_used())
 {
-    auto ia = [m]() -> const void* {
-        import_array();
-        return &m;
-    };
-    if (ia() == NULL) {
-        throw py::error_already_set();
-    }
-
     py::class_<RendererAgg>(m, "RendererAgg", py::buffer_protocol())
         .def(py::init<unsigned int, unsigned int, double>(),
              "width"_a, "height"_a, "dpi"_a)

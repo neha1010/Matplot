@@ -1,7 +1,6 @@
 """
-Matplotlib includes a framework for arbitrary geometric
-transformations that is used determine the final position of all
-elements drawn on the canvas.
+Matplotlib includes a framework for arbitrary geometric transformations that is used to
+determine the final position of all elements drawn on the canvas.
 
 Transforms are composed into trees of `TransformNode` objects
 whose actual value depends on their children.  When the contents of
@@ -11,10 +10,10 @@ reflect those changes.  This invalidation/caching approach prevents
 unnecessary recomputations of transforms, and contributes to better
 interactive performance.
 
-For example, here is a graph of the transform tree used to plot data
-to the graph:
+For example, here is a graph of the transform tree used to plot data to the figure:
 
-.. image:: ../_static/transforms.png
+.. graphviz:: /api/transforms.dot
+    :alt: Diagram of transform tree from data to figure coordinates.
 
 The framework can be used for both affine and non-affine
 transformations.  However, for speed, we want to use the backend
@@ -2682,6 +2681,25 @@ class ScaledTranslation(Affine2DBase):
             self._mtx[:2, 2] = self._scale_trans.transform(self._t)
             self._invalid = 0
             self._inverted = None
+        return self._mtx
+
+
+class _ScaledRotation(Affine2DBase):
+    """
+    A transformation that applies rotation by *theta*, after transform by *trans_shift*.
+    """
+    def __init__(self, theta, trans_shift):
+        super().__init__()
+        self._theta = theta
+        self._trans_shift = trans_shift
+        self._mtx = None
+
+    def get_matrix(self):
+        if self._invalid:
+            transformed_coords = self._trans_shift.transform([[self._theta, 0]])[0]
+            adjusted_theta = transformed_coords[0]
+            rotation = Affine2D().rotate(adjusted_theta)
+            self._mtx = rotation.get_matrix()
         return self._mtx
 
 

@@ -194,14 +194,15 @@ class FigureBase(Artist):
             Selects which ticklabels to rotate.
         """
         _api.check_in_list(['major', 'minor', 'both'], which=which)
-        allsubplots = all(ax.get_subplotspec() for ax in self.axes)
-        if len(self.axes) == 1:
+        axes = [ax for ax in self.axes if ax._label != '<colorbar>']
+        allsubplots = all(ax.get_subplotspec() for ax in axes)
+        if len(axes) == 1:
             for label in self.axes[0].get_xticklabels(which=which):
                 label.set_ha(ha)
                 label.set_rotation(rotation)
         else:
             if allsubplots:
-                for ax in self.get_axes():
+                for ax in axes:
                     if ax.get_subplotspec().is_last_row():
                         for label in ax.get_xticklabels(which=which):
                             label.set_ha(ha)
@@ -211,7 +212,8 @@ class FigureBase(Artist):
                             label.set_visible(False)
                         ax.set_xlabel('')
 
-        if allsubplots:
+        engine = self.get_layout_engine()
+        if allsubplots and (engine is None or engine.adjust_compatible):
             self.subplots_adjust(bottom=bottom)
         self.stale = True
 
@@ -378,7 +380,7 @@ default: %(va)s
         self.stale = True
         return suplab
 
-    @_docstring.Substitution(x0=0.5, y0=0.98, name='suptitle', ha='center',
+    @_docstring.Substitution(x0=0.5, y0=0.98, name='super title', ha='center',
                              va='top', rc='title')
     @_docstring.copy(_suplabels)
     def suptitle(self, t, **kwargs):
@@ -393,7 +395,7 @@ default: %(va)s
         text_obj = self._suptitle
         return "" if text_obj is None else text_obj.get_text()
 
-    @_docstring.Substitution(x0=0.5, y0=0.01, name='supxlabel', ha='center',
+    @_docstring.Substitution(x0=0.5, y0=0.01, name='super xlabel', ha='center',
                              va='bottom', rc='label')
     @_docstring.copy(_suplabels)
     def supxlabel(self, t, **kwargs):
@@ -408,7 +410,7 @@ default: %(va)s
         text_obj = self._supxlabel
         return "" if text_obj is None else text_obj.get_text()
 
-    @_docstring.Substitution(x0=0.02, y0=0.5, name='supylabel', ha='left',
+    @_docstring.Substitution(x0=0.02, y0=0.5, name='super ylabel', ha='left',
                              va='center', rc='label')
     @_docstring.copy(_suplabels)
     def supylabel(self, t, **kwargs):
@@ -2808,6 +2810,36 @@ None}, default: None
 
     get_axes = axes.fget
 
+    @property
+    def number(self):
+        """The figure id, used to identify figures in `.pyplot`."""
+        # Historically, pyplot dynamically added a number attribute to figure.
+        # However, this number must stay in sync with the figure manager.
+        # AFAICS overwriting the number attribute does not have the desired
+        # effect for pyplot. But there are some repos in GitHub that do change
+        # number. So let's take it slow and properly migrate away from writing.
+        #
+        # Making the dynamic attribute private and wrapping it in a property
+        # allows to maintain current behavior and deprecate write-access.
+        #
+        # When the deprecation expires, there's no need for duplicate state
+        # anymore and the private _number attribute can be replaced by
+        # `self.canvas.manager.num` if that exists and None otherwise.
+        if hasattr(self, '_number'):
+            return self._number
+        else:
+            raise AttributeError(
+                "'Figure' object has no attribute 'number'. In the future this"
+                "will change to returning 'None' instead.")
+
+    @number.setter
+    def number(self, num):
+        _api.warn_deprecated(
+            "3.10",
+            message="Changing 'Figure.number' is deprecated since %(since)s and "
+                    "will raise an error starting %(removal)s")
+        self._number = num
+
     def _get_renderer(self):
         if hasattr(self.canvas, 'get_renderer'):
             return self.canvas.get_renderer()
@@ -2972,7 +3004,8 @@ None}, default: None
 
     @_docstring.interpd
     def figimage(self, X, xo=0, yo=0, alpha=None, norm=None, cmap=None,
-                 vmin=None, vmax=None, origin=None, resize=False, **kwargs):
+                 vmin=None, vmax=None, origin=None, resize=False, *,
+                 colorizer=None, **kwargs):
         """
         Add a non-resampled image to the figure.
 
@@ -3015,6 +3048,10 @@ None}, default: None
         resize : bool
             If *True*, resize the figure to match the given image size.
 
+        %(colorizer_doc)s
+
+            This parameter is ignored if *X* is RGB(A).
+
         Returns
         -------
         `matplotlib.image.FigureImage`
@@ -3048,6 +3085,7 @@ None}, default: None
             self.set_size_inches(figsize, forward=True)
 
         im = mimage.FigureImage(self, cmap=cmap, norm=norm,
+                                colorizer=colorizer,
                                 offsetx=xo, offsety=yo,
                                 origin=origin, **kwargs)
         im.stale_callback = _stale_figure_callback
@@ -3055,6 +3093,7 @@ None}, default: None
         im.set_array(X)
         im.set_alpha(alpha)
         if norm is None:
+            im._check_exclusionary_keywords(colorizer, vmin=vmin, vmax=vmax)
             im.set_clim(vmin, vmax)
         self.images.append(im)
         im._remove_method = self.images.remove

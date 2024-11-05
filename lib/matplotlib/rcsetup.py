@@ -682,7 +682,7 @@ def cycler(*args, **kwargs):
     Call signatures::
 
       cycler(cycler)
-      cycler(label=values[, label2=values2[, ...]])
+      cycler(label=values, label2=values2, ...)
       cycler(label, values)
 
     Form 1 copies a given `~cycler.Cycler` object.
@@ -1118,6 +1118,10 @@ _validators = {
     "axes3d.xaxis.panecolor":    validate_color,  # 3d background pane
     "axes3d.yaxis.panecolor":    validate_color,  # 3d background pane
     "axes3d.zaxis.panecolor":    validate_color,  # 3d background pane
+
+    "axes3d.mouserotationstyle": ["azel", "trackball", "sphere", "arcball"],
+    "axes3d.trackballsize": validate_float,
+    "axes3d.trackballborder": validate_float,
 
     # scatter props
     "scatter.marker":     _validate_marker,

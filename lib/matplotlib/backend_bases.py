@@ -961,6 +961,10 @@ class GraphicsContextBase:
         """Get the hatch linewidth."""
         return self._hatch_linewidth
 
+    def set_hatch_linewidth(self, hatch_linewidth):
+        """Set the hatch linewidth."""
+        self._hatch_linewidth = hatch_linewidth
+
     def get_sketch_params(self):
         """
         Return the sketch parameters for the artist.
@@ -1324,6 +1328,28 @@ class MouseEvent(LocationEvent):
         If this is unset, *name* is "scroll_event", and *step* is nonzero, then
         this will be set to "up" or "down" depending on the sign of *step*.
 
+    buttons : None or frozenset
+        For 'motion_notify_event', the mouse buttons currently being pressed
+        (a set of zero or more MouseButtons);
+        for other events, None.
+
+        .. note::
+           For 'motion_notify_event', this attribute is more accurate than
+           the ``button`` (singular) attribute, which is obtained from the last
+           'button_press_event' or 'button_release_event' that occurred within
+           the canvas (and thus 1. be wrong if the last change in mouse state
+           occurred when the canvas did not have focus, and 2. cannot report
+           when multiple buttons are pressed).
+
+           This attribute is not set for 'button_press_event' and
+           'button_release_event' because GUI toolkits are inconsistent as to
+           whether they report the button state *before* or *after* the
+           press/release occurred.
+
+        .. warning::
+           On macOS, the Tk backends only report a single button even if
+           multiple buttons are pressed.
+
     key : None or str
         The key pressed when the mouse event triggered, e.g. 'shift'.
         See `KeyEvent`.
@@ -1356,7 +1382,8 @@ class MouseEvent(LocationEvent):
     """
 
     def __init__(self, name, canvas, x, y, button=None, key=None,
-                 step=0, dblclick=False, guiEvent=None, *, modifiers=None):
+                 step=0, dblclick=False, guiEvent=None, *,
+                 buttons=None, modifiers=None):
         super().__init__(
             name, canvas, x, y, guiEvent=guiEvent, modifiers=modifiers)
         if button in MouseButton.__members__.values():
@@ -1367,6 +1394,16 @@ class MouseEvent(LocationEvent):
             elif step < 0:
                 button = "down"
         self.button = button
+        if name == "motion_notify_event":
+            self.buttons = frozenset(buttons if buttons is not None else [])
+        else:
+            # We don't support 'buttons' for button_press/release_event because
+            # toolkits are inconsistent as to whether they report the state
+            # before or after the event.
+            if buttons:
+                raise ValueError(
+                    "'buttons' is only supported for 'motion_notify_event'")
+            self.buttons = None
         self.key = key
         self.step = step
         self.dblclick = dblclick
@@ -2780,6 +2817,8 @@ class NavigationToolbar2:
         ('Save', 'Save the figure', 'filesave', 'save_figure'),
       )
 
+    UNKNOWN_SAVED_STATUS = object()
+
     def __init__(self, canvas):
         self.canvas = canvas
         canvas.toolbar = self
@@ -3194,7 +3233,26 @@ class NavigationToolbar2:
         return self.subplot_tool
 
     def save_figure(self, *args):
-        """Save the current figure."""
+        """
+        Save the current figure.
+
+        Backend implementations may choose to return
+        the absolute path of the saved file, if any, as
+        a string.
+
+        If no file is created then `None` is returned.
+
+        If the backend does not implement this functionality
+        then `NavigationToolbar2.UNKNOWN_SAVED_STATUS` is returned.
+
+        Returns
+        -------
+        str or `NavigationToolbar2.UNKNOWN_SAVED_STATUS` or `None`
+            The filepath of the saved figure.
+            Returns `None` if figure is not saved.
+            Returns `NavigationToolbar2.UNKNOWN_SAVED_STATUS` when
+            the backend does not provide the information.
+        """
         raise NotImplementedError
 
     def update(self):

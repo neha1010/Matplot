@@ -1,12 +1,14 @@
 import contextlib
-from collections import namedtuple
+from collections import namedtuple, deque
 import datetime
 from decimal import Decimal
 from functools import partial
+import gc
 import inspect
 import io
 from itertools import product
 import platform
+import sys
 from types import SimpleNamespace
 
 import dateutil.tz
@@ -23,6 +25,8 @@ import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
+from matplotlib.lines import Line2D
+from matplotlib.collections import PathCollection
 import matplotlib.font_manager as mfont_manager
 import matplotlib.markers as mmarkers
 import matplotlib.patches as mpatches
@@ -33,7 +37,7 @@ import matplotlib.pyplot as plt
 import matplotlib.text as mtext
 import matplotlib.ticker as mticker
 import matplotlib.transforms as mtransforms
-import mpl_toolkits.axisartist as AA  # type: ignore
+import mpl_toolkits.axisartist as AA  # type: ignore[import]
 from numpy.testing import (
     assert_allclose, assert_array_equal, assert_array_almost_equal)
 from matplotlib.testing.decorators import (
@@ -2976,7 +2980,7 @@ class TestScatter:
 
 
 def _params(c=None, xsize=2, *, edgecolors=None, **kwargs):
-    return (c, edgecolors, kwargs if kwargs is not None else {}, xsize)
+    return (c, edgecolors, kwargs, xsize)
 _result = namedtuple('_result', 'c, colors')
 
 
@@ -9209,6 +9213,49 @@ def test_axes_clear_behavior(fig_ref, fig_test, which):
     ax_test.grid(True)
 
 
+@pytest.mark.skipif(
+    sys.version_info[:3] == (3, 13, 0) and sys.version_info.releaselevel != "final",
+    reason="https://github.com/python/cpython/issues/124538",
+)
+def test_axes_clear_reference_cycle():
+    def assert_not_in_reference_cycle(start):
+        # Breadth first search. Return True if we encounter the starting node
+        to_visit = deque([start])
+        explored = set()
+        while len(to_visit) > 0:
+            parent = to_visit.popleft()
+            for child in gc.get_referents(parent):
+                if id(child) in explored:
+                    continue
+                assert child is not start
+                explored.add(id(child))
+                to_visit.append(child)
+
+    fig = Figure()
+    ax = fig.add_subplot()
+    points = np.random.rand(1000)
+    ax.plot(points, points)
+    ax.scatter(points, points)
+    ax_children = ax.get_children()
+    fig.clear()  # This should break the reference cycle
+
+    # Care most about the objects that scale with number of points
+    big_artists = [
+        a for a in ax_children
+        if isinstance(a, (Line2D, PathCollection))
+    ]
+    assert len(big_artists) > 0
+    for big_artist in big_artists:
+        assert_not_in_reference_cycle(big_artist)
+    assert len(ax_children) > 0
+    for child in ax_children:
+        # Make sure this doesn't raise because the child is already removed.
+        try:
+            child.remove()
+        except NotImplementedError:
+            pass  # not implemented is expected for some artists
+
+
 def test_boxplot_tick_labels():
     # Test the renamed `tick_labels` parameter.
     # Test for deprecation of old name `labels`.
@@ -9314,3 +9361,94 @@ def test_boxplot_orientation(fig_test, fig_ref):
 
         ax_test = fig_test.subplots()
         ax_test.boxplot(all_data, orientation='horizontal')
+
+
+@image_comparison(["use_colorizer_keyword.png"],
+                   tol=0.05 if platform.machine() == 'arm64' else 0)
+def test_use_colorizer_keyword():
+    # test using the colorizer keyword
+    np.random.seed(0)
+    rand_x = np.random.random(100)
+    rand_y = np.random.random(100)
+    c = np.arange(25, dtype='float32').reshape((5, 5))
+
+    fig, axes = plt.subplots(3, 4)
+    norm = mpl.colors.Normalize(4, 20)
+    cl = mpl.colorizer.Colorizer(norm=norm, cmap='RdBu')
+
+    axes[0, 0].scatter(c, c, c=c, colorizer=cl)
+    axes[0, 1].hexbin(rand_x, rand_y, colorizer=cl, gridsize=(2, 2))
+    axes[0, 2].imshow(c, colorizer=cl)
+    axes[0, 3].pcolor(c, colorizer=cl)
+    axes[1, 0].pcolormesh(c, colorizer=cl)
+    axes[1, 1].pcolorfast(c, colorizer=cl)  # style = image
+    axes[1, 2].pcolorfast((0, 1, 2, 3, 4, 5), (0, 1, 2, 3, 5, 6),  c,
+                          colorizer=cl)  # style = pcolorimage
+    axes[1, 3].pcolorfast(c.T, c, c[:4, :4], colorizer=cl)  # style = quadmesh
+    axes[2, 0].contour(c, colorizer=cl)
+    axes[2, 1].contourf(c, colorizer=cl)
+    axes[2, 2].tricontour(c.T.ravel(), c.ravel(), c.ravel(), colorizer=cl)
+    axes[2, 3].tricontourf(c.T.ravel(), c.ravel(), c.ravel(), colorizer=cl)
+
+    fig.figimage(np.repeat(np.repeat(c, 15, axis=0), 15, axis=1), colorizer=cl)
+    remove_ticks_and_titles(fig)
+
+
+def test_wrong_use_colorizer():
+    # test using the colorizer keyword and norm or cmap
+    np.random.seed(0)
+    rand_x = np.random.random(100)
+    rand_y = np.random.random(100)
+    c = np.arange(25, dtype='float32').reshape((5, 5))
+
+    fig, axes = plt.subplots(3, 4)
+    norm = mpl.colors.Normalize(4, 20)
+    cl = mpl.colorizer.Colorizer(norm=norm, cmap='RdBu')
+
+    match_str = "The `colorizer` keyword cannot be used simultaneously"
+    kwrds = [{'vmin': 0}, {'vmax': 0}, {'norm': 'log'}, {'cmap': 'viridis'}]
+    for kwrd in kwrds:
+        with pytest.raises(ValueError, match=match_str):
+            axes[0, 0].scatter(c, c, c=c, colorizer=cl, **kwrd)
+    for kwrd in kwrds:
+        with pytest.raises(ValueError, match=match_str):
+            axes[0, 0].scatter(c, c, c=c, colorizer=cl, **kwrd)
+    for kwrd in kwrds:
+        with pytest.raises(ValueError, match=match_str):
+            axes[0, 1].hexbin(rand_x, rand_y, colorizer=cl, gridsize=(2, 2), **kwrd)
+    for kwrd in kwrds:
+        with pytest.raises(ValueError, match=match_str):
+            axes[0, 2].imshow(c, colorizer=cl, **kwrd)
+    for kwrd in kwrds:
+        with pytest.raises(ValueError, match=match_str):
+            axes[0, 3].pcolor(c, colorizer=cl, **kwrd)
+    for kwrd in kwrds:
+        with pytest.raises(ValueError, match=match_str):
+            axes[1, 0].pcolormesh(c, colorizer=cl, **kwrd)
+    for kwrd in kwrds:
+        with pytest.raises(ValueError, match=match_str):
+            axes[1, 1].pcolorfast(c, colorizer=cl, **kwrd)  # style = image
+    for kwrd in kwrds:
+        with pytest.raises(ValueError, match=match_str):
+            axes[1, 2].pcolorfast((0, 1, 2, 3, 4, 5), (0, 1, 2, 3, 5, 6),  c,
+                                  colorizer=cl, **kwrd)  # style = pcolorimage
+    for kwrd in kwrds:
+        with pytest.raises(ValueError, match=match_str):
+            axes[1, 3].pcolorfast(c.T, c, c[:4, :4], colorizer=cl, **kwrd)  # quadmesh
+    for kwrd in kwrds:
+        with pytest.raises(ValueError, match=match_str):
+            axes[2, 0].contour(c, colorizer=cl, **kwrd)
+    for kwrd in kwrds:
+        with pytest.raises(ValueError, match=match_str):
+            axes[2, 1].contourf(c, colorizer=cl, **kwrd)
+    for kwrd in kwrds:
+        with pytest.raises(ValueError, match=match_str):
+            axes[2, 2].tricontour(c.T.ravel(), c.ravel(), c.ravel(), colorizer=cl,
+                                  **kwrd)
+    for kwrd in kwrds:
+        with pytest.raises(ValueError, match=match_str):
+            axes[2, 3].tricontourf(c.T.ravel(), c.ravel(), c.ravel(), colorizer=cl,
+                                   **kwrd)
+    for kwrd in kwrds:
+        with pytest.raises(ValueError, match=match_str):
+            fig.figimage(c, colorizer=cl, **kwrd)
