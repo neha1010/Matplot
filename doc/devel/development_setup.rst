@@ -212,7 +212,7 @@ Additionally, the following non-Python dependencies must also be installed local
 
 * :ref:`c++ compiler<compile-dependencies>`
 * :ref:`documentation build dependencies <doc-dependencies-external>`
-
+* :ref:`ninja <ninja-dependencies>`
 
 For a full list of dependencies, see :ref:`dependencies`. External dependencies do not
 need to be installed when working in codespaces.
