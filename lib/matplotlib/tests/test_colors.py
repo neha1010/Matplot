@@ -1740,14 +1740,14 @@ def test_lsc_from_list_color_alpha_tuple():
     mcolors.LinearSegmentedColormap.from_list("testcolormap", valid_colors)
 
 
-@pytest.mark.parametrize("colors, error",
-                         [([(0.42, "blue"), (.1, .1, .1, .1)], ValueError),
-                          (["blue", (0.42, "red")], ValueError),
-                          (["blue", (.1, .1, .1, .1), ("red", 2)], ValueError),
-                          ([(0, "red"), (1.1, "blue")], ValueError),
-                          ([(0.52, "red"), (0.42, "blue")], ValueError)])
-def test_lsc_from_list_invalid_inputs(colors, error):
-    with pytest.raises(error):
+@pytest.mark.parametrize("colors",
+                         [[(0.42, "blue"), (.1, .1, .1, .1)],
+                          ["blue", (0.42, "red")],
+                          ["blue", (.1, .1, .1, .1), ("red", 2)],
+                          [(0, "red"), (1.1, "blue")],
+                          [(0.52, "red"), (0.42, "blue")]])
+def test_lsc_from_list_invalid_inputs(colors):
+    with pytest.raises(ValueError):
         mcolors.LinearSegmentedColormap.from_list("testcolormap", colors)
 
 
