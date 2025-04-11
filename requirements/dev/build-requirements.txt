@@ -1,3 +1,4 @@
 pybind11>=2.13.2,!=2.13.3
 meson-python
 setuptools-scm
+setuptools>=70.0.0 # not directly required, pinned by Snyk to avoid a vulnerability
