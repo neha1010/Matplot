@@ -24,3 +24,4 @@ sphinx-copybutton
 sphinx-design
 sphinx-gallery[parallel]>=0.12.0
 sphinx-tags>=0.4.0
+urllib3>=2.5.0 # not directly required, pinned by Snyk to avoid a vulnerability
